@@ -1,0 +1,36 @@
+# InStock 三层架构依赖
+
+# Web框架
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# 数据库 (SQLite)
+SQLAlchemy>=2.0.0
+# SQLite是Python内置的，不需要额外安装
+
+# 数据处理
+pandas>=2.0.0
+numpy>=1.24.0
+
+# 技术指标 (纯Python，无需C编译)
+pandas-ta>=0.3.14b
+
+# HTTP请求 (支持同步/异步)
+httpx>=0.25.0
+
+# 定时任务
+APScheduler>=3.10.0
+
+# 日志 (基于标准库 logging 实现，支持颜色输出)
+
+# JSON解析
+py_mini_racer>=0.6.0
+
+# 数据库迁移(可选)
+alembic>=1.12.0
+
+# 测试(可选)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
