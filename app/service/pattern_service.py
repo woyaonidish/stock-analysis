@@ -5,7 +5,6 @@
 形态识别服务 - 使用纯Python实现
 """
 
-import logging
 from datetime import date, datetime
 from typing import Optional, List, Dict
 import pandas as pd

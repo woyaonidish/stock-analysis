@@ -10,6 +10,16 @@ from sqlalchemy import Column, String, Float, Date
 from app.database import Base
 
 
+class StockStrategy(Base):
+    """策略选股结果 - 统一的策略结果表"""
+    __tablename__ = 'cn_stock_strategy'
+    
+    date = Column(Date, primary_key=True, comment='日期')
+    code = Column(String(6), primary_key=True, comment='代码')
+    strategy_type = Column(String(32), primary_key=True, comment='策略类型')
+    score = Column(Float, default=1.0, comment='得分')
+
+
 class StockStrategyBase(Base):
     """策略选股基类 - 不映射到具体表"""
     __abstract__ = True

@@ -10,6 +10,7 @@ from app.entity.etf_spot import ETFSpot
 from app.entity.stock_indicator import StockIndicator
 from app.entity.stock_pattern import StockPattern
 from app.entity.stock_strategy import (
+    StockStrategy,
     StockStrategyBase, StockStrategyEnter, StockStrategyKeepIncreasing,
     StockStrategyParkingApron, StockStrategyBacktraceMA250,
     StockStrategyBreakthroughPlatform, StockStrategyLowBacktraceIncrease,
@@ -28,6 +29,7 @@ __all__ = [
     'ETFSpot',
     'StockIndicator',
     'StockPattern',
+    'StockStrategy',
     'StockStrategyBase', 'StockStrategyEnter', 'StockStrategyKeepIncreasing',
     'StockStrategyParkingApron', 'StockStrategyBacktraceMA250',
     'StockStrategyBreakthroughPlatform', 'StockStrategyLowBacktraceIncrease',

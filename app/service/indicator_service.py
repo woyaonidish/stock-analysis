@@ -5,7 +5,6 @@
 指标计算服务 - 使用pandas-ta实现
 """
 
-import logging
 from datetime import date, datetime
 from typing import Optional, List, Dict
 import pandas as pd

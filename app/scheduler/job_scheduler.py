@@ -5,15 +5,14 @@
 定时任务调度器
 """
 
-import logging
 from datetime import date, datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.config import settings
+from app.utils.logger import get_logger, info, warning, error
 
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 scheduler = None
 

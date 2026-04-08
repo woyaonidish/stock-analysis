@@ -5,14 +5,13 @@
 资金流向服务
 """
 
-import logging
 from datetime import date, datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 import pandas as pd
 from sqlalchemy.orm import Session
 
 from app.dao.stock_dao import StockDAO
-from app.entity.fund_flow import FundFlow
+from app.entity.fund_flow import StockFundFlow
 from app.crawler.stock_fund_crawler import StockFundCrawler
 from app.database import SessionLocal
 from app.utils.logger import get_logger
@@ -80,7 +79,7 @@ class FundFlowService:
         # 转换为实体列表
         entities = []
         for _, row in data.iterrows():
-            entity = FundFlow(
+            entity = StockFundFlow(
                 date=trade_date,
                 code=str(row.get('代码', '')),
                 name=str(row.get('名称', '')),
@@ -128,7 +127,7 @@ class FundFlowService:
         
         return result
     
-    def get_top_inflow(self, trade_date: date, limit: int = 50) -> List[FundFlow]:
+    def get_top_inflow(self, trade_date: date, limit: int = 50) -> List[StockFundFlow]:
         """
         获取资金净流入前N名
         
@@ -142,7 +141,7 @@ class FundFlowService:
         # 需要实现fund_flow_dao
         return []
     
-    def get_top_outflow(self, trade_date: date, limit: int = 50) -> List[FundFlow]:
+    def get_top_outflow(self, trade_date: date, limit: int = 50) -> List[StockFundFlow]:
         """
         获取资金净流出前N名
         

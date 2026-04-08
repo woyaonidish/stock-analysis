@@ -5,7 +5,6 @@
 回测服务
 """
 
-import logging
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict
 import pandas as pd
