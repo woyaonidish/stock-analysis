@@ -162,19 +162,21 @@ class StockService:
                 pre_close_price=float(row.get('pre_close_price', 0) or 0),
                 total_market_cap=float(row.get('total_market_cap', 0) or 0),
                 free_cap=float(row.get('free_cap', 0) or 0),
-                pe=float(row.get('pe9', 0) or 0),
-                pb=float(row.get('pbnewmrq', 0) or 0),
+                pe9=float(row.get('pe9', 0) or 0),
+                pbnewmrq=float(row.get('pbnewmrq', 0) or 0),
                 industry=str(row.get('industry', ''))
             )
             entities.append(entity)
         
         # 批量保存
-        self.stock_dao.batch_save(entities)
+        self.stock_dao.save_all(entities)
         return len(entities)
     
     def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
         """
         同步抓取并保存每日股票数据
+        
+        直接获取A股实时行情全量数据，失败自动重试
         
         Args:
             trade_date: 交易日期
@@ -186,8 +188,8 @@ class StockService:
             trade_date = date.today()
         
         try:
-            # 获取股票列表
-            data = self.fetcher.get_stock_list()
+            # 获取A股实时行情全量数据（带重试机制）
+            data = self.fetcher.get_stock_list_with_realtime(retry_count=3)
             if data is None or data.empty:
                 logger.warning(f"获取股票数据为空: {trade_date}")
                 return 0
@@ -205,6 +207,8 @@ class StockService:
         """
         异步抓取并保存每日股票数据
         
+        直接获取A股实时行情全量数据，失败自动重试
+        
         Args:
             trade_date: 交易日期
             
@@ -215,8 +219,8 @@ class StockService:
             trade_date = date.today()
         
         try:
-            # 异步获取股票列表
-            data = await self.fetcher.async_get_stock_list()
+            # 异步获取A股实时行情全量数据（带重试机制）
+            data = await self.fetcher.async_get_stock_list_with_realtime(retry_count=3)
             if data is None or data.empty:
                 logger.warning(f"获取股票数据为空: {trade_date}")
                 return 0

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # 定时任务配置
     SCHEDULER_ENABLED: bool = True
     
+    # Tushare 数据源配置
+    TUSHARE_TOKEN: str = "030f103b115b8b36efa987367d24a5959686b51090af2250820d9869"
+    
     @property
     def DATABASE_URL(self) -> str:
         """获取数据库连接URL"""

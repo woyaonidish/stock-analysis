@@ -85,6 +85,8 @@ def init_db():
     # 输出初始化信息
     if not db_exists:
         info(f"创建数据库文件: {db_path}")
+    else:
+        info(f"数据库文件存在: {db_path}")
     
     # 获取已创建的表数量
     inspector = inspect(engine)
