@@ -9,7 +9,6 @@ from datetime import date, datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from app.config import settings
 from app.utils.logger import get_logger, info, warning, error
 
 logger = get_logger(__name__)

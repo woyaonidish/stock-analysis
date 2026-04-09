@@ -11,7 +11,6 @@ import asyncio
 from typing import List, Optional
 
 from app.crawler.base_crawler import BaseCrawler
-from app.config import settings
 
 
 # JS解密代码

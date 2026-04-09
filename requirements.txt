@@ -20,10 +20,14 @@ pandas-ta>=0.3.14b
 # HTTP请求 (支持同步/异步)
 httpx>=0.25.0
 
+# 股票数据源 (akshare - 免费、开源)
+akshare>=1.12.0
+
 # 定时任务
 APScheduler>=3.10.0
 
-# 日志 (基于标准库 logging 实现，支持颜色输出)
+# 日志 (loguru - 支持颜色和文件跳转)
+loguru>=0.7.0
 
 # JSON解析
 py_mini_racer>=0.6.0

@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from datetime import date
 
-from app.config import settings
+from app.config.config import settings
 from app.database import init_db
 from app.controller import stock_controller, etf_controller, fund_flow_controller
 from app.controller import indicator_controller, strategy_controller, backtest_controller

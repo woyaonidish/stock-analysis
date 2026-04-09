@@ -13,7 +13,7 @@ import httpx
 from typing import Optional, Dict, List
 import os
 
-from app.config import settings
+from app.config.config import settings
 from app.utils.logger import warning, error
 
 

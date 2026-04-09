@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Generator
 from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from app.config import settings, BASE_DIR
+from app.config.config import settings, BASE_DIR
 from app.utils.logger import info, warning, error
 
 # 创建SQLite数据库引擎
