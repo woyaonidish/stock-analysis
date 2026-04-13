@@ -5,20 +5,24 @@
 InStock FastAPI 应用入口
 """
 
-import uvicorn
 import asyncio
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import threading
+import uvicorn
 from contextlib import asynccontextmanager
 from datetime import date
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.config.config import settings
-from app.database import init_db
-from app.scheduler.job_scheduler import start_scheduler
 from app.controller import stock_controller, etf_controller, fund_flow_controller
 from app.controller import indicator_controller, strategy_controller, backtest_controller
-from app.utils.trade_time import is_trade_date
+from app.dao.stock_dao import StockDAO
+from app.database import init_db, SessionLocal
+from app.scheduler.job_scheduler import start_scheduler
+from app.service.stock_service import StockService
 from app.utils.logger import get_logger, info, warning, error
+from app.utils.trade_time import is_trade_date
 
 logger = get_logger(__name__)
 
@@ -29,10 +33,6 @@ async def async_fetch_daily_data_task():
     
     使用异步方式执行，不阻塞主服务启动
     """
-    from app.database import SessionLocal
-    from app.service.stock_service import StockService
-    from app.dao.stock_dao import StockDAO
-    
     today = date.today()
     
     # 检查是否为交易日
@@ -70,8 +70,6 @@ async def async_fetch_daily_data_task():
 
 def start_background_fetch():
     """启动后台异步数据获取任务"""
-    import threading
-    
     def run_async_task():
         """在新线程中运行异步任务"""
         loop = asyncio.new_event_loop()
