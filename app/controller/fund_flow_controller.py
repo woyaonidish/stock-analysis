@@ -24,7 +24,7 @@ async def get_individual_fund_flow(
     """获取个股资金流向排名"""
     try:
         service = FundFlowService(db)
-        data = service.get_individual_fund_flow(indicator)
+        data = await service.get_individual_fund_flow(indicator)
         
         if not data.empty:
             return {
@@ -46,7 +46,7 @@ async def get_sector_fund_flow(
     """获取板块资金流向排名"""
     try:
         service = FundFlowService(db)
-        data = service.get_sector_fund_flow(indicator, sector_type)
+        data = await service.get_sector_fund_flow(indicator, sector_type)
         
         if not data.empty:
             return {
@@ -73,7 +73,7 @@ async def fetch_fund_flow_data(
         else:
             trade_date = date.today()
         
-        result = service.fetch_and_save_daily_data(trade_date)
+        result = await service.fetch_and_save_daily_data(trade_date)
         
         return {
             "code": 0,

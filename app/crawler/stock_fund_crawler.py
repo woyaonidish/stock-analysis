@@ -2,13 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-资金流向数据爬虫 - 使用 httpx 支持同步和异步请求
+资金流向数据爬虫 - 使用 httpx 异步请求
 """
 
 import json
 import math
 import time
-import random
 import asyncio
 import pandas as pd
 from typing import Optional
@@ -59,19 +58,16 @@ class StockFundCrawler(BaseCrawler):
         ],
     }
     
-    # ==================== 同步方法 ====================
-    
-    def get_individual_fund_flow_rank(self, indicator: str = "5日") -> pd.DataFrame:
+    async def get_individual_fund_flow_rank(self, indicator: str = "5日") -> pd.DataFrame:
         """获取个股资金流向排名"""
         url = "http://push2.eastmoney.com/api/qt/clist/get"
         page_size = 50
-        page_current = 1
         
         params = {
             "fid": self.INDIVIDUAL_INDICATOR_MAP[indicator][0],
             "po": "1",
             "pz": page_size,
-            "pn": page_current,
+            "pn": 1,
             "np": "1",
             "fltt": "2",
             "invt": "2",
@@ -80,21 +76,28 @@ class StockFundCrawler(BaseCrawler):
             "fields": self.INDIVIDUAL_INDICATOR_MAP[indicator][1],
         }
         
-        r = self.request(url, params=params)
+        r = await self.async_request(url, params=params)
         data_json = r.json()
         data = data_json["data"]["diff"]
         data_count = data_json["data"]["total"]
         page_count = math.ceil(data_count / page_size)
         
-        while page_count > 1:
-            time.sleep(random.uniform(1, 1.5))
-            page_current += 1
-            params["pn"] = page_current
-            r = self.request(url, params=params)
-            data_json = r.json()
-            _data = data_json["data"]["diff"]
-            data.extend(_data)
-            page_count -= 1
+        # 异步请求剩余页面
+        if page_count > 1:
+            urls = []
+            params_list = []
+            for page in range(2, page_count + 1):
+                page_params = params.copy()
+                page_params["pn"] = page
+                urls.append(url)
+                params_list.append(page_params)
+            
+            responses = await self.async_batch_request(urls, params_list, delay=0.3)
+            
+            for response in responses:
+                if response:
+                    _data = response.json()["data"]["diff"]
+                    data.extend(_data)
         
         temp_df = pd.DataFrame(data)
         temp_df = temp_df[~temp_df["f2"].isin(["-"])]
@@ -185,16 +188,15 @@ class StockFundCrawler(BaseCrawler):
             "10日小单净流入-净额", "10日小单净流入-净占比",
         ]]
     
-    def get_sector_fund_flow_rank(
+    async def get_sector_fund_flow_rank(
         self, indicator: str = "10日", sector_type: str = "行业资金流"
     ) -> pd.DataFrame:
         """获取板块资金流向排名"""
         url = "http://push2.eastmoney.com/api/qt/clist/get"
         page_size = 50
-        page_current = 1
         
         params = {
-            "pn": page_current,
+            "pn": 1,
             "pz": page_size,
             "po": "1",
             "np": "1",
@@ -210,7 +212,7 @@ class StockFundCrawler(BaseCrawler):
             "_": int(time.time() * 1000),
         }
         
-        r = self.request(url, params=params)
+        r = await self.async_request(url, params=params)
         text_data = r.text
         data_json = json.loads(text_data[text_data.find("{"): -2])
         data = data_json["data"]["diff"]
@@ -218,16 +220,24 @@ class StockFundCrawler(BaseCrawler):
         data_count = data_json["data"]["total"]
         page_count = math.ceil(data_count / page_size)
         
-        while page_count > 1:
-            time.sleep(random.uniform(1, 1.5))
-            page_current += 1
-            params["pn"] = page_current
-            r = self.request(url, params=params)
-            text_data = r.text
-            json_data = json.loads(text_data[text_data.find("{"): -2])
-            _data = json_data["data"]["diff"]
-            data.extend(_data)
-            page_count -= 1
+        # 异步请求剩余页面
+        if page_count > 1:
+            urls = []
+            params_list = []
+            for page in range(2, page_count + 1):
+                page_params = params.copy()
+                page_params["pn"] = page
+                urls.append(url)
+                params_list.append(page_params)
+            
+            responses = await self.async_batch_request(urls, params_list, delay=0.3)
+            
+            for response in responses:
+                if response:
+                    text_data = response.text
+                    json_data = json.loads(text_data[text_data.find("{"): -2])
+                    _data = json_data["data"]["diff"]
+                    data.extend(_data)
         
         temp_df = pd.DataFrame(data)
         temp_df = temp_df[~temp_df["f2"].isin(["-"])]
@@ -301,130 +311,6 @@ class StockFundCrawler(BaseCrawler):
             "10日主力净流入最大股",
         ]]
     
-    # ==================== 异步方法 ====================
-    
-    async def async_get_individual_fund_flow_rank(self, indicator: str = "5日") -> pd.DataFrame:
-        """异步获取个股资金流向排名"""
-        url = "http://push2.eastmoney.com/api/qt/clist/get"
-        page_size = 50
-        
-        params = {
-            "fid": self.INDIVIDUAL_INDICATOR_MAP[indicator][0],
-            "po": "1",
-            "pz": page_size,
-            "pn": 1,
-            "np": "1",
-            "fltt": "2",
-            "invt": "2",
-            "ut": "b2884a393a59ad64002292a3e90d46a5",
-            "fs": "m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:7+f:!2,m:1+t:3+f:!2",
-            "fields": self.INDIVIDUAL_INDICATOR_MAP[indicator][1],
-        }
-        
-        r = await self.async_request(url, params=params)
-        data_json = r.json()
-        data = data_json["data"]["diff"]
-        data_count = data_json["data"]["total"]
-        page_count = math.ceil(data_count / page_size)
-        
-        # 异步请求剩余页面
-        if page_count > 1:
-            urls = []
-            params_list = []
-            for page in range(2, page_count + 1):
-                page_params = params.copy()
-                page_params["pn"] = page
-                urls.append(url)
-                params_list.append(page_params)
-            
-            responses = await self.async_batch_request(urls, params_list, delay=0.3)
-            
-            for response in responses:
-                if response:
-                    _data = response.json()["data"]["diff"]
-                    data.extend(_data)
-        
-        temp_df = pd.DataFrame(data)
-        temp_df = temp_df[~temp_df["f2"].isin(["-"])]
-        
-        if indicator == "今日":
-            temp_df = self._process_today_columns(temp_df)
-        elif indicator == "3日":
-            temp_df = self._process_3day_columns(temp_df)
-        elif indicator == "5日":
-            temp_df = self._process_5day_columns(temp_df)
-        elif indicator == "10日":
-            temp_df = self._process_10day_columns(temp_df)
-        
-        return temp_df
-    
-    async def async_get_sector_fund_flow_rank(
-        self, indicator: str = "10日", sector_type: str = "行业资金流"
-    ) -> pd.DataFrame:
-        """异步获取板块资金流向排名"""
-        url = "http://push2.eastmoney.com/api/qt/clist/get"
-        page_size = 50
-        
-        params = {
-            "pn": 1,
-            "pz": page_size,
-            "po": "1",
-            "np": "1",
-            "ut": "b2884a393a59ad64002292a3e90d46a5",
-            "fltt": "2",
-            "invt": "2",
-            "fid0": self.SECTOR_INDICATOR_MAP[indicator][0],
-            "fs": f"m:90 t:{self.SECTOR_TYPE_MAP[sector_type]}",
-            "stat": self.SECTOR_INDICATOR_MAP[indicator][1],
-            "fields": self.SECTOR_INDICATOR_MAP[indicator][2],
-            "rt": "52975239",
-            "cb": "jQuery18308357908311220152_1589256588824",
-            "_": int(time.time() * 1000),
-        }
-        
-        r = await self.async_request(url, params=params)
-        text_data = r.text
-        data_json = json.loads(text_data[text_data.find("{"): -2])
-        data = data_json["data"]["diff"]
-        
-        data_count = data_json["data"]["total"]
-        page_count = math.ceil(data_count / page_size)
-        
-        # 异步请求剩余页面
-        if page_count > 1:
-            urls = []
-            params_list = []
-            for page in range(2, page_count + 1):
-                page_params = params.copy()
-                page_params["pn"] = page
-                urls.append(url)
-                params_list.append(page_params)
-            
-            responses = await self.async_batch_request(urls, params_list, delay=0.3)
-            
-            for response in responses:
-                if response:
-                    text_data = response.text
-                    json_data = json.loads(text_data[text_data.find("{"): -2])
-                    _data = json_data["data"]["diff"]
-                    data.extend(_data)
-        
-        temp_df = pd.DataFrame(data)
-        temp_df = temp_df[~temp_df["f2"].isin(["-"])]
-        
-        if indicator == "今日":
-            temp_df = self._process_sector_today_columns(temp_df)
-        elif indicator == "5日":
-            temp_df = self._process_sector_5day_columns(temp_df)
-        elif indicator == "10日":
-            temp_df = self._process_sector_10day_columns(temp_df)
-        
-        return temp_df
-    
-    def crawl(self, indicator: str = "5日", **kwargs) -> pd.DataFrame:
-        """实现爬取方法"""
-        return self.get_individual_fund_flow_rank(indicator)
-    
-    async def async_crawl(self, indicator: str = "5日", **kwargs) -> pd.DataFrame:
+    async def crawl(self, indicator: str = "5日", **kwargs) -> pd.DataFrame:
         """异步爬取方法"""
-        return await self.async_get_individual_fund_flow_rank(indicator)
+        return await self.get_individual_fund_flow_rank(indicator)

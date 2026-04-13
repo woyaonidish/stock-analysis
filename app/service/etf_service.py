@@ -27,7 +27,7 @@ class ETFService:
         self.etf_dao = ETFDAO(self.session)
         self.etf_crawler = ETFCrawler()
     
-    def get_etf_list(self, trade_date: date = None) -> pd.DataFrame:
+    async def get_etf_list(self, trade_date: date = None) -> pd.DataFrame:
         """
         获取ETF列表
         
@@ -46,7 +46,7 @@ class ETFService:
             return pd.DataFrame([e.__dict__ for e in etfs])
         
         # 数据库没有则从网络获取
-        return self.etf_crawler.get_etf_spot()
+        return await self.etf_crawler.get_etf_spot()
     
     def get_etf_spot(self, code: str, trade_date: date = None) -> Optional[ETFSpot]:
         """
@@ -64,7 +64,7 @@ class ETFService:
         
         return self.etf_dao.find_by_code_and_date(code, trade_date)
     
-    def get_etf_hist(
+    async def get_etf_hist(
         self,
         code: str,
         start_date: str = None,
@@ -85,7 +85,7 @@ class ETFService:
         Returns:
             历史数据DataFrame
         """
-        return self.etf_crawler.get_etf_hist(
+        return await self.etf_crawler.get_etf_hist(
             symbol=code,
             period=period,
             start_date=start_date or "19700101",
@@ -93,7 +93,7 @@ class ETFService:
             adjust=adjust
         )
     
-    def get_etf_hist_min(
+    async def get_etf_hist_min(
         self,
         code: str,
         period: str = "5",
@@ -114,7 +114,7 @@ class ETFService:
         Returns:
             分时数据DataFrame
         """
-        return self.etf_crawler.get_etf_hist_min(
+        return await self.etf_crawler.get_etf_hist_min(
             symbol=code,
             period=period,
             start_date=start_date or "1979-09-01 09:32:00",
@@ -162,10 +162,10 @@ class ETFService:
             entities.append(entity)
         
         # 批量保存
-        self.etf_dao.batch_save(entities)
+        self.etf_dao.save_all(entities)
         return len(entities)
     
-    def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
+    async def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
         """
         抓取并保存每日ETF数据
         
@@ -180,7 +180,7 @@ class ETFService:
         
         try:
             # 获取ETF列表
-            data = self.etf_crawler.get_etf_spot()
+            data = await self.etf_crawler.get_etf_spot()
             if data is None or data.empty:
                 logger.warning(f"获取ETF数据为空: {trade_date}")
                 return 0

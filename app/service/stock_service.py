@@ -29,9 +29,9 @@ class StockService:
         self.fetcher = EastMoneyFetcher()
         self.hist_crawler = StockHistCrawler()
     
-    def get_stock_list(self, trade_date: date = None) -> pd.DataFrame:
+    async def get_stock_list(self, trade_date: date = None) -> pd.DataFrame:
         """
-        获取股票列表
+        异步获取股票列表
         
         Args:
             trade_date: 交易日期
@@ -48,7 +48,7 @@ class StockService:
             return pd.DataFrame([s.__dict__ for s in stocks])
         
         # 数据库没有则从网络获取
-        return self.fetcher.get_stock_list()
+        return await self.fetcher.get_stock_list()
     
     def get_stock_spot(self, code: str, trade_date: date = None) -> Optional[StockSpot]:
         """
@@ -66,7 +66,7 @@ class StockService:
         
         return self.stock_dao.find_by_code_and_date(code, trade_date)
     
-    def get_stock_hist(
+    async def get_stock_hist(
         self, 
         code: str, 
         start_date: str = None, 
@@ -87,7 +87,7 @@ class StockService:
         Returns:
             历史数据DataFrame
         """
-        return self.hist_crawler.get_stock_hist(
+        return await self.hist_crawler.get_stock_hist(
             symbol=code,
             period=period,
             start_date=start_date or "19700101",
@@ -95,7 +95,7 @@ class StockService:
             adjust=adjust
         )
     
-    def get_stock_hist_min(
+    async def get_stock_hist_min(
         self,
         code: str,
         period: str = "5",
@@ -116,7 +116,7 @@ class StockService:
         Returns:
             分时数据DataFrame
         """
-        return self.hist_crawler.get_stock_hist_min(
+        return await self.hist_crawler.get_stock_hist_min(
             symbol=code,
             period=period,
             start_date=start_date or "1979-09-01 09:32:00",
@@ -172,38 +172,7 @@ class StockService:
         self.stock_dao.save_all(entities)
         return len(entities)
     
-    def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
-        """
-        同步抓取并保存每日股票数据
-        
-        直接获取A股实时行情全量数据，失败自动重试
-        
-        Args:
-            trade_date: 交易日期
-            
-        Returns:
-            保存的记录数
-        """
-        if trade_date is None:
-            trade_date = date.today()
-        
-        try:
-            # 获取A股实时行情全量数据（带重试机制）
-            data = self.fetcher.get_stock_list_with_realtime(retry_count=3)
-            if data is None or data.empty:
-                logger.warning(f"获取股票数据为空: {trade_date}")
-                return 0
-            
-            # 保存数据
-            count = self.save_stock_spot_data(data, trade_date)
-            logger.info(f"保存股票数据成功: {trade_date}, 共{count}条")
-            return count
-            
-        except Exception as e:
-            logger.error(f"抓取并保存股票数据失败: {e}")
-            return 0
-    
-    async def async_fetch_and_save_daily_data(self, trade_date: date = None) -> int:
+    async def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
         """
         异步抓取并保存每日股票数据
         
@@ -220,7 +189,7 @@ class StockService:
         
         try:
             # 异步获取A股实时行情全量数据（带重试机制）
-            data = await self.fetcher.async_get_stock_list_with_realtime(retry_count=3)
+            data = await self.fetcher.get_stock_list_with_realtime(retry_count=3)
             if data is None or data.empty:
                 logger.warning(f"获取股票数据为空: {trade_date}")
                 return 0
@@ -282,14 +251,14 @@ class StockService:
         stocks = self.stock_dao.find_by_date(trade_date)
         return [s.code for s in stocks] if stocks else []
     
-    def get_code_id_map(self) -> Dict[str, int]:
+    async def get_code_id_map(self) -> Dict[str, int]:
         """
-        获取股票代码与市场ID映射
+        异步获取股票代码与市场ID映射
         
         Returns:
             代码到市场ID的映射字典
         """
-        return self.fetcher.get_code_id_map()
+        return await self.fetcher.get_code_id_map()
     
     def close(self):
         """关闭会话"""

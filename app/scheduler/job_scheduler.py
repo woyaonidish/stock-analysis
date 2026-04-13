@@ -67,6 +67,8 @@ def stop_scheduler():
 
 def daily_data_job():
     """每日数据抓取任务"""
+    import asyncio
+    
     try:
         logger.info("开始执行每日数据抓取任务")
         
@@ -75,15 +77,22 @@ def daily_data_job():
         
         trade_date = date.today()
         
-        # 抓取股票数据
-        stock_service = StockService()
-        stock_count = stock_service.fetch_and_save_daily_data(trade_date)
-        stock_service.close()
+        # 创建新的事件循环来运行异步任务
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        # 抓取ETF数据
-        etf_service = ETFService()
-        etf_count = etf_service.fetch_and_save_daily_data(trade_date)
-        etf_service.close()
+        try:
+            # 抓取股票数据
+            stock_service = StockService()
+            stock_count = loop.run_until_complete(stock_service.fetch_and_save_daily_data(trade_date))
+            stock_service.close()
+            
+            # 抓取ETF数据
+            etf_service = ETFService()
+            etf_count = loop.run_until_complete(etf_service.fetch_and_save_daily_data(trade_date))
+            etf_service.close()
+        finally:
+            loop.close()
         
         logger.info(f"每日数据抓取完成: 股票{stock_count}条, ETF{etf_count}条")
         

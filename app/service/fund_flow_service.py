@@ -27,7 +27,7 @@ class FundFlowService:
         self.stock_dao = StockDAO(self.session)
         self.fund_crawler = StockFundCrawler()
     
-    def get_individual_fund_flow(self, indicator: str = "5日") -> pd.DataFrame:
+    async def get_individual_fund_flow(self, indicator: str = "5日") -> pd.DataFrame:
         """
         获取个股资金流向
         
@@ -37,9 +37,9 @@ class FundFlowService:
         Returns:
             资金流向DataFrame
         """
-        return self.fund_crawler.get_individual_fund_flow_rank(indicator)
+        return await self.fund_crawler.get_individual_fund_flow_rank(indicator)
     
-    def get_sector_fund_flow(
+    async def get_sector_fund_flow(
         self, 
         indicator: str = "10日", 
         sector_type: str = "行业资金流"
@@ -54,7 +54,7 @@ class FundFlowService:
         Returns:
             板块资金流向DataFrame
         """
-        return self.fund_crawler.get_sector_fund_flow_rank(indicator, sector_type)
+        return await self.fund_crawler.get_sector_fund_flow_rank(indicator, sector_type)
     
     def save_fund_flow_data(
         self, 
@@ -99,7 +99,7 @@ class FundFlowService:
         
         return len(entities)
     
-    def fetch_and_save_daily_data(self, trade_date: date = None) -> Dict[str, int]:
+    async def fetch_and_save_daily_data(self, trade_date: date = None) -> Dict[str, int]:
         """
         抓取并保存每日资金流向数据
         
@@ -117,7 +117,7 @@ class FundFlowService:
         
         for indicator in indicators:
             try:
-                data = self.get_individual_fund_flow(indicator)
+                data = await self.get_individual_fund_flow(indicator)
                 count = self.save_fund_flow_data(data, trade_date, indicator)
                 result[indicator] = count
                 logger.info(f"保存资金流向数据成功: {trade_date} {indicator}, 共{count}条")

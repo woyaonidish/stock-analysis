@@ -30,7 +30,7 @@ async def get_etf_list(
         else:
             trade_date = date.today()
         
-        data = service.get_etf_list(trade_date)
+        data = await service.get_etf_list(trade_date)
         
         if isinstance(data, pd.DataFrame):
             return {
@@ -91,7 +91,7 @@ async def get_etf_hist(
     """获取ETF历史K线数据"""
     try:
         service = ETFService(db)
-        data = service.get_etf_hist(code, start_date, end_date, period, adjust)
+        data = await service.get_etf_hist(code, start_date, end_date, period, adjust)
         
         if isinstance(data, pd.DataFrame) and not data.empty:
             return {
@@ -117,7 +117,7 @@ async def fetch_daily_data(
         else:
             trade_date = date.today()
         
-        count = service.fetch_and_save_daily_data(trade_date)
+        count = await service.fetch_and_save_daily_data(trade_date)
         
         return {
             "code": 0,

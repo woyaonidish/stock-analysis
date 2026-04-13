@@ -14,6 +14,7 @@ from datetime import date
 
 from app.config.config import settings
 from app.database import init_db
+from app.scheduler.job_scheduler import start_scheduler
 from app.controller import stock_controller, etf_controller, fund_flow_controller
 from app.controller import indicator_controller, strategy_controller, backtest_controller
 from app.utils.trade_time import is_trade_date
@@ -54,7 +55,7 @@ async def async_fetch_daily_data_task():
         # 没有当日数据，开始异步获取
         info(f"[后台任务] 开始异步获取 {today} 的股票数据...")
         stock_service = StockService(session)
-        count = await stock_service.async_fetch_and_save_daily_data(today)
+        count = await stock_service.fetch_and_save_daily_data(today)
         
         if count > 0:
             info(f"[后台任务] 成功获取并保存 {count} 条股票数据")
@@ -92,12 +93,11 @@ async def lifespan(app: FastAPI):
     info(f"启动 {settings.APP_NAME} v{settings.APP_VERSION}")
     init_db()
     
-    # 启动后台异步数据获取（不阻塞主服务）
+    # 启动后台数据获取任务（服务启动后立即检查并获取当日数据）
     start_background_fetch()
     
-    # 启动定时任务
+    # 启动定时任务调度器
     if settings.SCHEDULER_ENABLED:
-        from app.scheduler.job_scheduler import start_scheduler
         start_scheduler()
     
     yield

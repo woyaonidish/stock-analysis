@@ -68,7 +68,7 @@ async def get_stock_list(
         else:
             trade_date = date.today()
         
-        data = service.get_stock_list(trade_date)
+        data = await service.get_stock_list(trade_date)
         
         if isinstance(data, pd.DataFrame):
             return {
@@ -133,7 +133,7 @@ async def get_stock_hist(
     """获取股票历史K线数据"""
     try:
         service = StockService(db)
-        data = service.get_stock_hist(code, start_date, end_date, period, adjust)
+        data = await service.get_stock_hist(code, start_date, end_date, period, adjust)
         
         if isinstance(data, pd.DataFrame) and not data.empty:
             return {
@@ -158,7 +158,7 @@ async def get_stock_hist_min(
     """获取股票分时数据"""
     try:
         service = StockService(db)
-        data = service.get_stock_hist_min(code, period, start_date, end_date, adjust)
+        data = await service.get_stock_hist_min(code, period, start_date, end_date, adjust)
         
         if isinstance(data, pd.DataFrame) and not data.empty:
             return {
@@ -217,7 +217,7 @@ async def fetch_daily_data(
         else:
             trade_date = date.today()
         
-        count = service.fetch_and_save_daily_data(trade_date)
+        count = await service.fetch_and_save_daily_data(trade_date)
         
         return {
             "code": 0,
