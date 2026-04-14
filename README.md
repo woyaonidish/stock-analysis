@@ -36,6 +36,8 @@ instock-app/
 ├── entity/              # 实体类
 ├── service/             # 服务层
 │   ├── stock_service.py           # 股票服务
+│   ├── index_service.py           # 指数服务
+│   ├── financial_service.py       # 财务数据服务
 │   ├── indicator_service.py       # 指标计算服务
 │   ├── pattern_service.py         # 形态识别服务
 │   └── strategy_service.py        # 策略选股服务
@@ -84,8 +86,33 @@ instock-app/
 - 股票实时行情（含五档买卖盘）
 - 股票历史K线（日线/周线/月线）
 - 股票分时数据（1/5/15/30/60分钟）
-- 股票列表（A股全量）
+- 股票列表（A股全量，过滤北交所）
+- 指数实时行情（上证指数、深证成指、创业板指等9只主要指数）
+- 财务数据（300+字段，含每股指标、盈利能力、成长能力、资产负债、现金流等）
 - 交易日历
+
+### 5. 指数行情
+
+支持9只主要指数实时行情：
+- 上证指数 (000001)
+- 上证50 (000016)
+- 沪深300 (000300)
+- 中证500 (000905)
+- 中证1000 (000852)
+- 深证成指 (399001)
+- 创业板指 (399006)
+- 中小板指 (399005)
+
+### 6. 财务数据
+
+精简核心财务指标（26个字段）：
+- 每股指标：EPS、扣非EPS、每股净资产、每股现金流
+- 盈利能力：ROE、销售净利率、销售毛利率
+- 成长能力：营收增长率、净利润增长率
+- 资产负债：资产负债率、流动比率、速动比率
+- 核心财务：营收、净利润、总资产、净资产
+- 现金流：经营/投资/筹资现金流
+- 股本数据：总股本、流通A股
 
 ## 快速开始
 
@@ -354,9 +381,302 @@ POST /api/stocks/fetch?trade_date=2026-04-08
 
 ---
 
-## 2. 技术指标接口 (/api/indicators)
+## 2. 指数行情接口 (/api/index)
 
-### 2.1 获取股票指标
+### 2.1 获取指数列表
+
+**接口**：`GET /api/index/list`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| trade_date | string | 否 | 交易日期(YYYY-MM-DD)，默认当天 |
+
+**请求示例**：
+```
+GET /api/index/list?trade_date=2026-04-08
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "code": "000001",
+            "name": "上证指数",
+            "date": "2026-04-08",
+            "open_price": 3250.50,
+            "close_price": 3280.25,
+            "high_price": 3295.00,
+            "low_price": 3245.00,
+            "pre_close": 3250.00,
+            "change_rate": 0.93,
+            "volume": 256789000,
+            "amount": 3521678900
+        },
+        {
+            "code": "399001",
+            "name": "深证成指",
+            "date": "2026-04-08",
+            "open_price": 10580.00,
+            "close_price": 10650.50,
+            "high_price": 10700.00,
+            "low_price": 10550.00,
+            "pre_close": 10580.00,
+            "change_rate": 0.67,
+            "volume": 189456000,
+            "amount": 2895678900
+        }
+    ]
+}
+```
+
+---
+
+### 2.2 获取指数详情
+
+**接口**：`GET /api/index/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 指数代码（路径参数） |
+| trade_date | string | 否 | 交易日期(YYYY-MM-DD) |
+
+**支持指数**：
+- 000001 - 上证指数
+- 000016 - 上证50
+- 000300 - 沪深300
+- 000905 - 中证500
+- 000852 - 中证1000
+- 399001 - 深证成指
+- 399005 - 中小板指
+- 399006 - 创业板指
+
+**请求示例**：
+```
+GET /api/index/000001?trade_date=2026-04-08
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "code": "000001",
+        "name": "上证指数",
+        "date": "2026-04-08",
+        "open_price": 3250.50,
+        "close_price": 3280.25,
+        "high_price": 3295.00,
+        "low_price": 3245.00,
+        "pre_close": 3250.00,
+        "change_rate": 0.93,
+        "volume": 256789000,
+        "amount": 3521678900
+    }
+}
+```
+
+---
+
+### 2.3 抓取并保存指数数据
+
+**接口**：`POST /api/index/fetch`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| trade_date | string | 否 | 交易日期(YYYY-MM-DD) |
+
+**请求示例**：
+```
+POST /api/index/fetch?trade_date=2026-04-08
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "count": 8
+    }
+}
+```
+
+---
+
+## 3. 财务数据接口 (/api/financial)
+
+### 3.1 获取股票财务数据
+
+**接口**：`GET /api/financial/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+| report_date | string | 否 | 报告期(YYYY-MM-DD)，默认最新 |
+
+**请求示例**：
+```
+GET /api/financial/000001
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "code": "000001",
+        "report_date": "2025-12-31",
+        "eps": 1.25,
+        "eps_deducted": 1.18,
+        "bvps": 18.50,
+        "cfps": 2.30,
+        "roe": 12.5,
+        "roe_weighted": 13.2,
+        "net_profit_margin": 25.6,
+        "gross_profit_margin": 45.8,
+        "revenue_growth": 8.5,
+        "net_profit_growth": 12.3,
+        "debt_ratio": 62.5,
+        "current_ratio": 1.85,
+        "quick_ratio": 1.45,
+        "revenue": 45678900000,
+        "net_profit": 11674500000,
+        "net_profit_parent": 11567800000,
+        "net_profit_deducted": 10892300000,
+        "total_assets": 589678000000,
+        "net_assets": 221345000000,
+        "operating_cf": 35678900000,
+        "investing_cf": -12567800000,
+        "financing_cf": -8967800000,
+        "total_shares": 19405000000,
+        "float_shares_a": 19405000000
+    }
+}
+```
+
+---
+
+### 3.2 获取历史财务数据
+
+**接口**：`GET /api/financial/{code}/history`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+| limit | int | 否 | 返回数量，默认8个报告期 |
+
+**请求示例**：
+```
+GET /api/financial/000001/history?limit=4
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "code": "000001",
+            "report_date": "2025-12-31",
+            "eps": 1.25,
+            "roe": 12.5,
+            "revenue_growth": 8.5,
+            "net_profit_growth": 12.3,
+            "revenue": 45678900000,
+            "net_profit": 11674500000
+        },
+        {
+            "code": "000001",
+            "report_date": "2025-09-30",
+            "eps": 0.95,
+            "roe": 9.8,
+            "revenue_growth": 7.2,
+            "net_profit_growth": 10.5,
+            "revenue": 34567800000,
+            "net_profit": 8894500000
+        }
+    ]
+}
+```
+
+---
+
+### 3.3 获取最新报告期
+
+**接口**：`GET /api/financial/latest-report-date`
+
+**参数**：无
+
+**请求示例**：
+```
+GET /api/financial/latest-report-date
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "report_date": "2025-12-31"
+    }
+}
+```
+
+---
+
+### 3.4 解析财务数据文件
+
+**接口**：`POST /api/financial/parse`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| filepath | string | 是 | 财务数据文件路径(gpcw*.zip) |
+
+**请求示例**：
+```
+POST /api/financial/parse?filepath=./data/gpcw20231231.zip
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "count": 5200
+    }
+}
+```
+
+**备注**：需先下载财务数据文件：
+```bash
+python -c "from mootdx.affair import Affair; Affair.fetch(downdir='./data', filename='gpcw20231231.zip')"
+```
+
+---
+
+## 4. 技术指标接口 (/api/indicators)
+
+### 4.1 获取股票指标
 
 **接口**：`GET /api/indicators/{code}`
 
@@ -400,7 +720,7 @@ GET /api/indicators/000001
 
 ---
 
-### 2.2 获取所有股票指标
+### 4.2 获取所有股票指标
 
 **接口**：`GET /api/indicators/list`
 
@@ -435,7 +755,7 @@ GET /api/indicators/list?trade_date=2026-04-08
 
 ---
 
-### 2.3 获取买入信号
+### 4.3 获取买入信号
 
 **接口**：`GET /api/indicators/signals/buy`
 
@@ -464,7 +784,7 @@ GET /api/indicators/signals/buy
 
 ---
 
-### 2.4 获取卖出信号
+### 4.4 获取卖出信号
 
 **接口**：`GET /api/indicators/signals/sell`
 
@@ -492,7 +812,7 @@ GET /api/indicators/signals/sell
 
 ---
 
-### 2.5 计算并保存指标
+### 4.5 计算并保存指标
 
 **接口**：`POST /api/indicators/calculate/{code}`
 
@@ -521,9 +841,9 @@ POST /api/indicators/calculate/000001
 
 ---
 
-## 3. 策略选股接口 (/api/strategy)
+## 5. 策略选股接口 (/api/strategy)
 
-### 3.1 获取策略类型列表
+### 5.1 获取策略类型列表
 
 **接口**：`GET /api/strategy/types`
 
@@ -553,7 +873,7 @@ GET /api/strategy/types
 
 ---
 
-### 3.2 获取策略结果
+### 5.2 获取策略结果
 
 **接口**：`GET /api/strategy/{strategy_type}`
 
@@ -587,7 +907,7 @@ GET /api/strategy/volume_up?trade_date=2026-04-08
 
 ---
 
-### 3.3 运行策略
+### 5.3 运行策略
 
 **接口**：`POST /api/strategy/run`
 
@@ -632,7 +952,7 @@ Content-Type: application/json
 
 ---
 
-### 3.4 运行所有策略
+### 5.4 运行所有策略
 
 **接口**：`POST /api/strategy/run-all`
 
@@ -666,9 +986,9 @@ POST /api/strategy/run-all?trade_date=2026-04-08
 
 ---
 
-## 4. 回测接口 (/api/backtest)
+## 6. 回测接口 (/api/backtest)
 
-### 4.1 运行回测
+### 6.1 运行回测
 
 **接口**：`POST /api/backtest/run`
 
@@ -723,7 +1043,7 @@ Content-Type: application/json
 
 ---
 
-### 4.2 运行所有策略回测
+### 6.2 运行所有策略回测
 
 **接口**：`POST /api/backtest/run-all`
 
@@ -782,6 +1102,8 @@ POST /api/backtest/run-all?start_date=2025-01-01&end_date=2026-04-08
 
 主要数据表：
 - `cn_stock_spot` - 股票实时行情（含五档买卖盘）
+- `cn_stock_index_spot` - 指数实时行情
+- `cn_stock_financial` - 股票财务数据（核心指标）
 - `cn_stock_indicator` - 技术指标
 - `cn_stock_pattern` - K线形态
 - `cn_stock_strategy_*` - 策略选股结果
