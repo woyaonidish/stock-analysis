@@ -11,7 +11,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import date
 
-from app.service.etf_service import ETFService
 from app.service.indicator_service import IndicatorService
 from app.service.stock_service import StockService
 from app.service.strategy_service import StrategyService
@@ -87,15 +86,10 @@ def daily_data_job():
             stock_service = StockService()
             stock_count = loop.run_until_complete(stock_service.fetch_and_save_daily_data(trade_date))
             stock_service.close()
-            
-            # 抓取ETF数据
-            etf_service = ETFService()
-            etf_count = loop.run_until_complete(etf_service.fetch_and_save_daily_data(trade_date))
-            etf_service.close()
         finally:
             loop.close()
         
-        logger.info(f"每日数据抓取完成: 股票{stock_count}条, ETF{etf_count}条")
+        logger.info(f"每日数据抓取完成: 股票{stock_count}条")
         
     except Exception as e:
         logger.error(f"每日数据抓取任务执行失败: {e}")

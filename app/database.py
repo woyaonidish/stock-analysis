@@ -63,13 +63,12 @@ def init_db():
     # 导入所有实体类，确保它们注册到Base.metadata
     # 此处使用局部导入以避免循环依赖（entity模块依赖database模块的Base）
     from app.entity import (
-        StockSpot, StockAttention, ETFSpot, StockIndicator, StockPattern,
+        StockSpot, StockAttention, StockIndicator, StockPattern,
         StockStrategyBase, StockStrategyEnter, StockStrategyKeepIncreasing,
         StockStrategyParkingApron, StockStrategyBacktraceMA250,
         StockStrategyBreakthroughPlatform, StockStrategyLowBacktraceIncrease,
         StockStrategyTurtleTrade, StockStrategyHighTightFlag,
         StockStrategyClimaxLimitdown, StockStrategyLowATR, STRATEGY_TABLES,
-        StockFundFlow, StockFundFlowIndustry, StockFundFlowConcept,
         StockSelection, StockBonus, StockLhb, StockBlocktrade,
         StockBacktestData, StockHistData
     )

@@ -170,32 +170,85 @@ class StockService:
         self.stock_dao.save_all(entities)
         return len(entities)
     
-    async def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
+    def _save_batch_data(self, data: pd.DataFrame, trade_date: date) -> int:
         """
-        异步抓取并保存每日股票数据
-        
-        批量并发获取全部A股实时行情
+        保存单批次股票行情数据
         
         Args:
+            data: 单批次股票数据DataFrame
             trade_date: 交易日期
             
         Returns:
             保存的记录数
         """
+        if data is None or data.empty:
+            return 0
+        
+        # 转换为实体列表
+        entities = []
+        for _, row in data.iterrows():
+            entity = StockSpot(
+                date=trade_date,
+                code=str(row.get('code', '')),
+                name=str(row.get('name', '')),
+                open_price=float(row.get('open_price', 0) or 0),
+                close_price=float(row.get('close_price', 0) or 0),
+                high_price=float(row.get('high_price', 0) or 0),
+                low_price=float(row.get('low_price', 0) or 0),
+                pre_close_price=float(row.get('pre_close_price', 0) or 0),
+                volume=int(row.get('volume', 0) or 0),
+                amount=int(row.get('amount', 0) or 0),
+                bid1=float(row.get('bid1', 0) or 0),
+                bid1_vol=int(row.get('bid1_vol', 0) or 0),
+                bid2=float(row.get('bid2', 0) or 0),
+                bid2_vol=int(row.get('bid2_vol', 0) or 0),
+                bid3=float(row.get('bid3', 0) or 0),
+                bid3_vol=int(row.get('bid3_vol', 0) or 0),
+                ask1=float(row.get('ask1', 0) or 0),
+                ask1_vol=int(row.get('ask1_vol', 0) or 0),
+                ask2=float(row.get('ask2', 0) or 0),
+                ask2_vol=int(row.get('ask2_vol', 0) or 0),
+                ask3=float(row.get('ask3', 0) or 0),
+                ask3_vol=int(row.get('ask3_vol', 0) or 0),
+            )
+            entities.append(entity)
+        
+        # 批量保存
+        self.stock_dao.save_all(entities)
+        return len(entities)
+    
+    async def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
+        """
+        异步抓取并保存每日股票数据
+        
+        批量获取全部A股实时行情，每批次获取后立即保存
+        
+        Args:
+            trade_date: 交易日期
+            
+        Returns:
+            保存的总记录数
+        """
         if trade_date is None:
             trade_date = date.today()
         
         try:
-            # 批量获取全部A股实时行情
-            data = await self.fetcher.get_all_stocks_realtime()
-            if data is None or data.empty:
-                logger.warning(f"获取股票数据为空: {trade_date}")
-                return 0
+            # 先删除旧数据
+            self.stock_dao.delete_by_date(trade_date)
+            logger.info(f"已删除 {trade_date} 的旧数据")
             
-            # 保存数据
-            count = self.save_stock_spot_data(data, trade_date)
-            logger.info(f"保存股票数据成功: {trade_date}, 共{count}条")
-            return count
+            # 定义批次保存回调函数
+            def batch_save_callback(batch_df: pd.DataFrame, batch_idx: int):
+                count = self._save_batch_data(batch_df, trade_date)
+                logger.debug(f"批次 {batch_idx + 1} 保存 {count} 条数据到数据库")
+            
+            # 批量获取全部A股实时行情，每批次立即保存
+            total_count = await self.fetcher.get_all_stocks_realtime(
+                on_batch_save=batch_save_callback
+            )
+            
+            logger.info(f"抓取并保存股票数据完成: {trade_date}, 共 {total_count} 条")
+            return total_count
             
         except Exception as e:
             logger.error(f"异步抓取并保存股票数据失败: {e}")

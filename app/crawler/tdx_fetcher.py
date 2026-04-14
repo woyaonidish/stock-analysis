@@ -10,7 +10,10 @@ import pandas as pd
 from typing import Dict, List, Optional
 from datetime import datetime, date
 from mootdx.quotes import Quotes
-from mootdx.consts import KLINE_TYPE
+from mootdx.consts import (
+    KLINE_DAILY, KLINE_WEEKLY, KLINE_MONTHLY,
+    KLINE_1MIN, KLINE_5MIN, KLINE_15MIN, KLINE_30MIN, KLINE_1HOUR
+)
 
 from app.utils.logger import get_logger
 
@@ -76,11 +79,24 @@ class TdxFetcher:
             # 重命名列
             df = df.rename(columns={'code': 'code', 'name': 'name'})
             
-            # 过滤只保留A股（6位数字代码）
-            df = df[df['code'].str.match(r'^[0-9]{6}$')]
+            # 过滤只保留沪深A股
+            # 沪市A股: 60xxxx, 科创板: 68xxxx
+            # 深市A股: 00xxxx, 创业板: 30xxxx
+            # 排除北交所(8xxxxx, 4xxxxx)和其他特殊品种
+            def is_valid_a_stock(code):
+                code = str(code).zfill(6)
+                # 沪市A股和科创板
+                if code.startswith('60') or code.startswith('68'):
+                    return True
+                # 深市A股和创业板
+                if code.startswith('00') or code.startswith('30'):
+                    return True
+                return False
+            
+            df = df[df['code'].apply(is_valid_a_stock)]
             df = df.reset_index(drop=True)
             
-            logger.info(f"获取A股股票列表成功，共 {len(df)} 条数据")
+            logger.info(f"获取A股股票列表成功，共 {len(df)} 条数据（已过滤北交所等特殊品种）")
             return df
         
         try:
@@ -89,12 +105,13 @@ class TdxFetcher:
             logger.error(f"获取股票列表失败: {e}")
             return pd.DataFrame()
     
-    async def get_stock_realtime(self, symbol: str) -> Dict:
+    async def get_stock_realtime(self, symbol: str, name: str = '') -> Dict:
         """
         异步获取单只股票实时行情
         
         Args:
             symbol: 股票代码
+            name: 股票名称（可选，MOOTDX quotes 不返回 name）
             
         Returns:
             股票行情字典
@@ -117,7 +134,7 @@ class TdxFetcher:
             
             return {
                 'code': symbol,
-                'name': str(row.get('name', '')),
+                'name': name,  # name 需要外部传入
                 'open_price': float(row.get('open', 0) or 0),
                 'close_price': float(row.get('price', 0) or 0),
                 'high_price': float(row.get('high', 0) or 0),
@@ -138,32 +155,49 @@ class TdxFetcher:
     async def get_stock_realtime_batch(
         self, 
         symbols: List[str], 
-        batch_size: int = 50
-    ) -> pd.DataFrame:
+        batch_size: int = 50,
+        on_batch_save: callable = None,
+        code_name_map: Dict[str, str] = None
+    ) -> int:
         """
         异步批量获取股票实时行情
         
-        分批并发请求，避免服务器拒绝
+        分批请求，每批次获取后可立即保存（通过回调函数）
         
         Args:
             symbols: 股票代码列表
             batch_size: 每批次数量
+            on_batch_save: 批次保存回调函数，接收 DataFrame 和批次索引
+            code_name_map: 股票代码到名称的映射字典
             
         Returns:
-            股票行情 DataFrame
+            总获取条数
         """
         if not symbols:
-            return pd.DataFrame()
+            return 0
         
-        logger.info(f"开始批量获取 {len(symbols)} 只股票实时行情...")
+        # 过滤无效股票代码，避免 NotImplementedError
+        def is_valid_code(code):
+            code = str(code).zfill(6)
+            return code.startswith('60') or code.startswith('68') or \
+                   code.startswith('00') or code.startswith('30')
         
-        results = []
-        total_batches = (len(symbols) + batch_size - 1) // batch_size
+        valid_symbols = [s for s in symbols if is_valid_code(s)]
+        if len(valid_symbols) < len(symbols):
+            logger.warning(f"过滤掉 {len(symbols) - len(valid_symbols)} 个无效股票代码")
+        
+        if not valid_symbols:
+            return 0
+        
+        logger.info(f"开始批量获取 {len(valid_symbols)} 只股票实时行情...")
+        
+        total_saved = 0
+        total_batches = (len(valid_symbols) + batch_size - 1) // batch_size
         
         for batch_idx in range(total_batches):
             start_idx = batch_idx * batch_size
-            end_idx = min(start_idx + batch_size, len(symbols))
-            batch_symbols = symbols[start_idx:end_idx]
+            end_idx = min(start_idx + batch_size, len(valid_symbols))
+            batch_symbols = valid_symbols[start_idx:end_idx]
             
             def _fetch_batch(symbols_batch):
                 client = self._get_client()
@@ -174,9 +208,11 @@ class TdxFetcher:
                         df = client.quotes(symbol=sym, market=market)
                         if df is not None and not df.empty:
                             row = df.iloc[0]
+                            # name 从映射字典获取，quotes 接口不返回 name
+                            stock_name = code_name_map.get(sym, '') if code_name_map else ''
                             batch_data.append({
                                 'code': sym,
-                                'name': str(row.get('name', '')),
+                                'name': stock_name,
                                 'open_price': float(row.get('open', 0) or 0),
                                 'close_price': float(row.get('price', 0) or 0),
                                 'high_price': float(row.get('high', 0) or 0),
@@ -197,28 +233,36 @@ class TdxFetcher:
                                 'ask3': float(row.get('ask3', 0) or 0),
                                 'ask3_vol': int(row.get('ask_vol3', 0) or 0),
                             })
-                    except Exception as e:
-                        logger.warning(f"获取股票 {sym} 数据失败: {e}")
+                    except Exception as err:
+                        logger.warning(f"获取股票 {sym} 数据失败: {err}")
                 return batch_data
             
             try:
                 batch_data = await asyncio.to_thread(_fetch_batch, batch_symbols)
-                results.extend(batch_data)
-                logger.info(f"批次 {batch_idx + 1}/{total_batches} 完成，获取 {len(batch_data)} 条")
+                
+                if batch_data:
+                    batch_df = pd.DataFrame(batch_data)
+                    saved_count = len(batch_data)
+                    
+                    # 调用保存回调
+                    if on_batch_save:
+                        try:
+                            on_batch_save(batch_df, batch_idx)
+                        except Exception as save_err:
+                            logger.error(f"批次 {batch_idx + 1} 保存失败: {save_err}")
+                    
+                    total_saved += saved_count
+                    logger.info(f"批次 {batch_idx + 1}/{total_batches} 完成，获取 {saved_count} 条，累计 {total_saved} 条")
                 
                 # 批次间延迟
                 if batch_idx < total_batches - 1:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(1)
                     
             except Exception as e:
                 logger.error(f"批次 {batch_idx + 1} 失败: {e}")
         
-        if not results:
-            return pd.DataFrame()
-        
-        df = pd.DataFrame(results)
-        logger.info(f"批量获取实时行情成功，共 {len(df)} 条数据")
-        return df
+        logger.info(f"批量获取实时行情完成，共获取 {total_saved} 条数据")
+        return total_saved
     
     async def get_stock_hist(
         self, 
@@ -247,11 +291,11 @@ class TdxFetcher:
             
             # K线类型映射
             kline_map = {
-                'daily': KLINE_TYPE.DAY,
-                'weekly': KLINE_TYPE.WEEK,
-                'monthly': KLINE_TYPE.MONTH,
+                'daily': KLINE_DAILY,
+                'weekly': KLINE_WEEKLY,
+                'monthly': KLINE_MONTHLY,
             }
-            kline_type = kline_map.get(period, KLINE_TYPE.DAY)
+            kline_type = kline_map.get(period, KLINE_DAILY)
             
             return client.bars(
                 symbol=symbol,
@@ -320,13 +364,13 @@ class TdxFetcher:
             
             # 分钟K线类型映射
             min_map = {
-                '1': KLINE_TYPE.MIN1,
-                '5': KLINE_TYPE.MIN5,
-                '15': KLINE_TYPE.MIN15,
-                '30': KLINE_TYPE.MIN30,
-                '60': KLINE_TYPE.MIN60,
+                '1': KLINE_1MIN,
+                '5': KLINE_5MIN,
+                '15': KLINE_15MIN,
+                '30': KLINE_30MIN,
+                '60': KLINE_1HOUR,
             }
-            kline_type = min_map.get(period, KLINE_TYPE.MIN5)
+            kline_type = min_map.get(period, KLINE_5MIN)
             
             return client.bars(
                 symbol=symbol,
@@ -363,24 +407,36 @@ class TdxFetcher:
             logger.error(f"获取股票 {symbol} 分时数据失败: {e}")
             return pd.DataFrame()
     
-    async def get_all_stocks_realtime(self) -> pd.DataFrame:
+    async def get_all_stocks_realtime(self, on_batch_save: callable = None) -> int:
         """
         异步获取全部A股实时行情
         
-        先获取股票列表，再批量获取行情
+        先获取股票列表建立 code→name 映射，再批量获取行情
         
+        Args:
+            on_batch_save: 批次保存回调函数
+            
         Returns:
-            全量股票行情 DataFrame
+            总获取条数
         """
-        # 获取股票列表
+        # 获取股票列表（包含 code 和 name）
         stock_list = await self.get_stock_list()
         if stock_list.empty:
-            return pd.DataFrame()
+            return 0
         
         symbols = stock_list['code'].tolist()
         
-        # 批量获取行情
-        return await self.get_stock_realtime_batch(symbols)
+        # 建立 code → name 映射字典
+        # 注意：MOOTDX quotes 接口不返回 name，需要从 stocks 接口获取
+        code_name_map = dict(zip(stock_list['code'], stock_list['name']))
+        logger.info(f"建立股票代码-名称映射，共 {len(code_name_map)} 条")
+        
+        # 批量获取行情（每批次保存），传入映射字典填充 name
+        return await self.get_stock_realtime_batch(
+            symbols, 
+            on_batch_save=on_batch_save,
+            code_name_map=code_name_map
+        )
     
     def close(self):
         """关闭客户端连接"""
