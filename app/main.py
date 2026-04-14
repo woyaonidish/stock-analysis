@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.config import settings
-from app.controller import stock_controller, indicator_controller, strategy_controller, backtest_controller, index_controller, financial_controller
+from app.controller import stock_controller, indicator_controller, strategy_controller, backtest_controller, index_controller, financial_controller, pattern_controller
 from app.dao.stock_dao import StockDAO
 from app.database import init_db, SessionLocal
 from app.scheduler.job_scheduler import start_scheduler
@@ -127,6 +127,7 @@ app.include_router(stock_controller.router, prefix="/api")
 app.include_router(index_controller.router, prefix="/api")
 app.include_router(financial_controller.router, prefix="/api")
 app.include_router(indicator_controller.router, prefix="/api")
+app.include_router(pattern_controller.router, prefix="/api")
 app.include_router(strategy_controller.router, prefix="/api")
 app.include_router(backtest_controller.router, prefix="/api")
 
