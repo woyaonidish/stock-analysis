@@ -6,6 +6,8 @@
 """
 
 from app.entity.stock_spot import StockSpot, StockAttention
+from app.entity.stock_index_spot import StockIndexSpot
+from app.entity.stock_financial import StockFinancial
 from app.entity.stock_indicator import StockIndicator
 from app.entity.stock_pattern import StockPattern
 from app.entity.stock_strategy import (
@@ -24,6 +26,8 @@ from app.entity.stock_other import (
 
 __all__ = [
     'StockSpot', 'StockAttention',
+    'StockIndexSpot',
+    'StockFinancial',
     'StockIndicator',
     'StockPattern',
     'StockStrategy',

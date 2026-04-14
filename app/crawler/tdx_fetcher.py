@@ -451,3 +451,149 @@ class TdxFetcher:
     async def crawl(self, *args, **kwargs):
         """异步爬取方法"""
         return await self.get_stock_list()
+    
+    # ==================== 指数数据获取 ====================
+    
+    # 主要指数代码映射
+    INDEX_CODE_MAP = {
+        # 沪市指数
+        '000001': ('上证指数', 1),
+        '000016': ('上证50', 1),
+        '000300': ('沪深300', 1),
+        '000905': ('中证500', 1),
+        '000852': ('中证1000', 1),
+        # 深市指数
+        '399001': ('深证成指', 0),
+        '399006': ('创业板指', 0),
+        '399300': ('沪深300', 0),  # 深市版本
+        '399005': ('中小板指', 0),
+    }
+    
+    async def get_index_realtime(self) -> pd.DataFrame:
+        """
+        异步获取主要指数实时行情
+        
+        Returns:
+            指数行情 DataFrame
+        """
+        def _fetch():
+            client = self._get_client()
+            logger.info("开始获取指数实时行情(MOOTDX)...")
+            
+            results = []
+            for code, (name, market) in self.INDEX_CODE_MAP.items():
+                try:
+                    df = client.index(market=market)
+                    if df is not None and not df.empty:
+                        # index 返回所有指数数据，筛选目标指数
+                        # 注意：MOOTDX index() 返回的是市场所有指数，不是单只
+                        # 需要通过其他方式获取单只指数行情
+                        pass
+                except Exception as e:
+                    logger.warning(f"获取指数 {code} 数据失败: {e}")
+            
+            # 实际上 MOOTDX 的 index() 返回市场指数列表
+            # 我们使用 quotes 获取指数实时数据
+            for code, (name, market) in self.INDEX_CODE_MAP.items():
+                try:
+                    df = client.quotes(symbol=code, market=market)
+                    if df is not None and not df.empty:
+                        row = df.iloc[0]
+                        results.append({
+                            'code': code,
+                            'name': name,
+                            'open_price': float(row.get('open', 0) or 0),
+                            'close_price': float(row.get('price', 0) or 0),
+                            'high_price': float(row.get('high', 0) or 0),
+                            'low_price': float(row.get('low', 0) or 0),
+                            'pre_close': float(row.get('last_close', 0) or 0),
+                            'volume': int(row.get('volume', 0) or 0),
+                            'amount': int(row.get('amount', 0) or 0),
+                        })
+                except Exception as e:
+                    logger.warning(f"获取指数 {code} 数据失败: {e}")
+            
+            if results:
+                df = pd.DataFrame(results)
+                # 计算涨跌幅
+                if 'pre_close' in df.columns and 'close_price' in df.columns:
+                    df['change_rate'] = ((df['close_price'] - df['pre_close']) / df['pre_close'] * 100).round(2)
+                logger.info(f"获取指数行情成功，共 {len(df)} 条")
+                return df
+            return pd.DataFrame()
+        
+        try:
+            return await asyncio.to_thread(_fetch)
+        except Exception as e:
+            logger.error(f"获取指数行情失败: {e}")
+            return pd.DataFrame()
+    
+    # ==================== 财务数据获取 ====================
+    
+    async def get_financial_data(self, filepath: str) -> pd.DataFrame:
+        """
+        异步解析财务数据文件
+        
+        MOOTDX 财务数据需要先下载 gpcw*.zip 文件，再解析
+        可通过 mootdx.affair.Affair.fetch() 下载
+        
+        Args:
+            filepath: 财务数据文件路径 (gpcw20231231.zip 或 .dat)
+            
+        Returns:
+            财务数据 DataFrame（完整字段）
+        """
+        def _parse():
+            from mootdx.financial.financial import FinancialReader
+            
+            logger.info(f"开始解析财务数据文件: {filepath}")
+            
+            try:
+                df = FinancialReader.to_data(filepath, header='zh')
+                logger.info(f"解析财务数据成功，共 {len(df)} 条，{len(df.columns)} 列")
+                return df
+            except Exception as e:
+                logger.error(f"解析财务数据失败: {e}")
+                return pd.DataFrame()
+        
+        try:
+            return await asyncio.to_thread(_parse)
+        except Exception as e:
+            logger.error(f"解析财务数据失败: {e}")
+            return pd.DataFrame()
+    
+    async def download_financial_files(self, downdir: str) -> List[str]:
+        """
+        异步下载财务数据文件列表
+        
+        Args:
+            downdir: 下载目录
+            
+        Returns:
+            下载的文件列表
+        """
+        def _download():
+            from mootdx.affair import Affair
+            from mootdx.financial.financial import FinancialList
+            
+            logger.info(f"开始获取财务数据文件列表...")
+            
+            # 获取文件列表
+            flist = FinancialList()
+            flist_file = flist.content(downdir=downdir + '/gpcw.txt')
+            
+            if flist_file is None:
+                logger.warning("获取财务文件列表失败")
+                return []
+            
+            # 解析文件列表
+            files = flist.parse(flist_file)
+            logger.info(f"获取到 {len(files)} 个财务数据文件")
+            
+            return files
+        
+        try:
+            return await asyncio.to_thread(_download)
+        except Exception as e:
+            logger.error(f"获取财务文件列表失败: {e}")
+            return []
