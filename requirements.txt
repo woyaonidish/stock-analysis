@@ -20,8 +20,8 @@ pandas-ta>=0.3.14b
 # HTTP请求 (支持同步/异步)
 httpx>=0.25.0
 
-# 股票数据源 (akshare - 免费、开源、新浪数据源稳定)
-akshare>=1.12.0
+# 股票数据源 (MOOTDX - 通达信数据接口)
+mootdx>=0.11.0
 
 # 定时任务
 APScheduler>=3.10.0

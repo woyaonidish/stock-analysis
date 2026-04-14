@@ -10,42 +10,9 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.dao.base_dao import BaseDAO
-from app.entity.fund_flow import StockFundFlow, StockFundFlowIndustry, StockFundFlowConcept
 from app.entity.stock_pattern import StockPattern
 from app.entity.stock_selection import StockSelection
 from app.entity.stock_other import StockBonus, StockLhb, StockBlocktrade, StockBacktestData
-
-
-class FundFlowDAO(BaseDAO[StockFundFlow]):
-    """资金流向DAO"""
-    def __init__(self, session: Session):
-        super().__init__(StockFundFlow, session)
-    
-    def find_main_inflow(self, query_date: date, limit: int = 100) -> List[StockFundFlow]:
-        """查询主力净流入最大的股票"""
-        return self.session.query(StockFundFlow).filter(
-            StockFundFlow.date == query_date,
-            StockFundFlow.fund_amount > 0
-        ).order_by(StockFundFlow.fund_amount.desc()).limit(limit).all()
-    
-    def find_main_outflow(self, query_date: date, limit: int = 100) -> List[StockFundFlow]:
-        """查询主力净流出最大的股票"""
-        return self.session.query(StockFundFlow).filter(
-            StockFundFlow.date == query_date,
-            StockFundFlow.fund_amount < 0
-        ).order_by(StockFundFlow.fund_amount.asc()).limit(limit).all()
-
-
-class FundFlowIndustryDAO(BaseDAO[StockFundFlowIndustry]):
-    """行业资金流向DAO"""
-    def __init__(self, session: Session):
-        super().__init__(StockFundFlowIndustry, session)
-
-
-class FundFlowConceptDAO(BaseDAO[StockFundFlowConcept]):
-    """概念资金流向DAO"""
-    def __init__(self, session: Session):
-        super().__init__(StockFundFlowConcept, session)
 
 
 class PatternDAO(BaseDAO[StockPattern]):
@@ -91,16 +58,6 @@ class SelectionDAO(BaseDAO[StockSelection]):
         """根据概念查询"""
         query = self.session.query(StockSelection).filter(
             StockSelection.concept.like(f'%{concept}%')
-        )
-        if query_date:
-            query = query.filter(StockSelection.date == query_date)
-        return query.all()
-    
-    def find_low_pe(self, max_pe: float = 20, query_date: date = None) -> List[StockSelection]:
-        """查询低市盈率股票"""
-        query = self.session.query(StockSelection).filter(
-            StockSelection.pe9 > 0,
-            StockSelection.pe9 <= max_pe
         )
         if query_date:
             query = query.filter(StockSelection.date == query_date)

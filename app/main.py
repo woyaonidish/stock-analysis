@@ -15,8 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.config import settings
-from app.controller import stock_controller, etf_controller, fund_flow_controller
-from app.controller import indicator_controller, strategy_controller, backtest_controller
+from app.controller import stock_controller, indicator_controller, strategy_controller, backtest_controller
 from app.dao.stock_dao import StockDAO
 from app.database import init_db, SessionLocal
 from app.scheduler.job_scheduler import start_scheduler
@@ -108,7 +107,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="InStock股票分析系统 - 三层架构实现",
+    description="InStock股票分析系统 - 三层架构实现 (MOOTDX数据源)",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -125,8 +124,6 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(stock_controller.router, prefix="/api")
-app.include_router(etf_controller.router, prefix="/api")
-app.include_router(fund_flow_controller.router, prefix="/api")
 app.include_router(indicator_controller.router, prefix="/api")
 app.include_router(strategy_controller.router, prefix="/api")
 app.include_router(backtest_controller.router, prefix="/api")

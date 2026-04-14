@@ -12,8 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.dao.stock_dao import StockDAO
 from app.entity.stock_spot import StockSpot
-from app.crawler.eastmoney_fetcher import EastMoneyFetcher
-from app.crawler.stock_hist_crawler import StockHistCrawler
+from app.crawler.tdx_fetcher import TdxFetcher
 from app.database import SessionLocal
 from app.utils.logger import get_logger
 
@@ -26,8 +25,7 @@ class StockService:
     def __init__(self, session: Session = None):
         self.session = session or SessionLocal()
         self.stock_dao = StockDAO(self.session)
-        self.fetcher = EastMoneyFetcher()
-        self.hist_crawler = StockHistCrawler()
+        self.fetcher = TdxFetcher()
     
     async def get_stock_list(self, trade_date: date = None) -> pd.DataFrame:
         """
@@ -87,7 +85,7 @@ class StockService:
         Returns:
             历史数据DataFrame
         """
-        return await self.hist_crawler.get_stock_hist(
+        return await self.fetcher.get_stock_hist(
             symbol=code,
             period=period,
             start_date=start_date or "19700101",
@@ -116,11 +114,9 @@ class StockService:
         Returns:
             分时数据DataFrame
         """
-        return await self.hist_crawler.get_stock_hist_min(
+        return await self.fetcher.get_stock_hist_min(
             symbol=code,
             period=period,
-            start_date=start_date or "1979-09-01 09:32:00",
-            end_date=end_date or "2222-01-01 09:32:00",
             adjust=adjust
         )
     
@@ -148,23 +144,25 @@ class StockService:
                 date=trade_date,
                 code=str(row.get('code', '')),
                 name=str(row.get('name', '')),
-                new_price=float(row.get('new_price', 0) or 0),
-                change_rate=float(row.get('change_rate', 0) or 0),
-                ups_downs=float(row.get('ups_downs', 0) or 0),
-                volume=float(row.get('volume', 0) or 0),
-                deal_amount=float(row.get('deal_amount', 0) or 0),
-                amplitude=float(row.get('amplitude', 0) or 0),
-                turnoverrate=float(row.get('turnoverrate', 0) or 0),
-                volume_ratio=float(row.get('volume_ratio', 0) or 0),
                 open_price=float(row.get('open_price', 0) or 0),
+                close_price=float(row.get('close_price', 0) or 0),
                 high_price=float(row.get('high_price', 0) or 0),
                 low_price=float(row.get('low_price', 0) or 0),
                 pre_close_price=float(row.get('pre_close_price', 0) or 0),
-                total_market_cap=float(row.get('total_market_cap', 0) or 0),
-                free_cap=float(row.get('free_cap', 0) or 0),
-                pe9=float(row.get('pe9', 0) or 0),
-                pbnewmrq=float(row.get('pbnewmrq', 0) or 0),
-                industry=str(row.get('industry', ''))
+                volume=int(row.get('volume', 0) or 0),
+                amount=int(row.get('amount', 0) or 0),
+                bid1=float(row.get('bid1', 0) or 0),
+                bid1_vol=int(row.get('bid1_vol', 0) or 0),
+                bid2=float(row.get('bid2', 0) or 0),
+                bid2_vol=int(row.get('bid2_vol', 0) or 0),
+                bid3=float(row.get('bid3', 0) or 0),
+                bid3_vol=int(row.get('bid3_vol', 0) or 0),
+                ask1=float(row.get('ask1', 0) or 0),
+                ask1_vol=int(row.get('ask1_vol', 0) or 0),
+                ask2=float(row.get('ask2', 0) or 0),
+                ask2_vol=int(row.get('ask2_vol', 0) or 0),
+                ask3=float(row.get('ask3', 0) or 0),
+                ask3_vol=int(row.get('ask3_vol', 0) or 0),
             )
             entities.append(entity)
         
@@ -176,7 +174,7 @@ class StockService:
         """
         异步抓取并保存每日股票数据
         
-        直接获取A股实时行情全量数据，失败自动重试
+        批量并发获取全部A股实时行情
         
         Args:
             trade_date: 交易日期
@@ -188,8 +186,8 @@ class StockService:
             trade_date = date.today()
         
         try:
-            # 异步获取A股实时行情全量数据（带重试机制）
-            data = await self.fetcher.get_stock_list_with_realtime(retry_count=3)
+            # 批量获取全部A股实时行情
+            data = await self.fetcher.get_all_stocks_realtime()
             if data is None or data.empty:
                 logger.warning(f"获取股票数据为空: {trade_date}")
                 return 0
@@ -229,7 +227,6 @@ class StockService:
         
         return self.stock_dao.search(
             keyword=keyword,
-            industry=industry,
             min_price=min_price,
             max_price=max_price,
             trade_date=trade_date
@@ -250,15 +247,6 @@ class StockService:
         
         stocks = self.stock_dao.find_by_date(trade_date)
         return [s.code for s in stocks] if stocks else []
-    
-    async def get_code_id_map(self) -> Dict[str, int]:
-        """
-        异步获取股票代码与市场ID映射
-        
-        Returns:
-            代码到市场ID的映射字典
-        """
-        return await self.fetcher.get_code_id_map()
     
     def close(self):
         """关闭会话"""
