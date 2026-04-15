@@ -15,7 +15,7 @@ from app.dao.strategy_dao import (
     StrategyBreakthroughDAO, StrategyTurtleDAO
 )
 from app.dao.other_dao import (
-    PatternDAO, SelectionDAO, BacktestDAO, LhbDAO, BlocktradeDAO, BonusDAO
+    PatternDAO, SelectionDAO, BacktestDAO, LhbDAO, BlocktradeDAO, BonusDAO, HistDAO
 )
 
 __all__ = [
@@ -27,5 +27,5 @@ __all__ = [
     'StrategyDAO', 'StrategyEnterDAO', 'StrategyKeepIncreasingDAO',
     'StrategyBreakthroughDAO', 'StrategyTurtleDAO',
     'PatternDAO', 'SelectionDAO', 'BacktestDAO',
-    'LhbDAO', 'BlocktradeDAO', 'BonusDAO'
+    'LhbDAO', 'BlocktradeDAO', 'BonusDAO', 'HistDAO'
 ]

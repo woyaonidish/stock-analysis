@@ -1056,3 +1056,336 @@ POST /api/backtest/run-all?start_date=2025-01-01&end_date=2026-04-08
     }
 }
 ```
+
+---
+
+## 8. 关注股票接口 (/api/attention)
+
+用户自选股管理接口，支持添加、删除、查询关注股票。
+
+### 8.1 获取关注股票列表
+
+**接口**：`GET /api/attention/list`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| trade_date | string | 否 | 交易日期(YYYY-MM-DD)，返回关注股票的行情信息 |
+
+**请求示例**：
+```
+GET /api/attention/list?trade_date=2026-04-08
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "code": "000001",
+            "name": "平安银行",
+            "date": "2026-04-08",
+            "close_price": 12.34,
+            "change_rate": 2.15,
+            "volume": 12345678,
+            "amount": 152345678.90
+        }
+    ]
+}
+```
+
+---
+
+### 8.2 获取关注股票代码
+
+**接口**：`GET /api/attention/codes`
+
+**参数**：无
+
+**请求示例**：
+```
+GET /api/attention/codes
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": ["000001", "000002", "600000"]
+}
+```
+
+---
+
+### 8.3 检查是否关注
+
+**接口**：`GET /api/attention/check/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+
+**请求示例**：
+```
+GET /api/attention/check/000001
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "code": "000001",
+        "is_attention": true
+    }
+}
+```
+
+---
+
+### 8.4 添加关注
+
+**接口**：`POST /api/attention/add/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+
+**请求示例**：
+```
+POST /api/attention/add/000001
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {"code": "000001"}
+}
+```
+
+---
+
+### 8.5 取消关注
+
+**接口**：`DELETE /api/attention/remove/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+
+**请求示例**：
+```
+DELETE /api/attention/remove/000001
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {"code": "000001"}
+}
+```
+
+---
+
+### 8.6 清空关注列表
+
+**接口**：`DELETE /api/attention/clear`
+
+**参数**：无
+
+**请求示例**：
+```
+DELETE /api/attention/clear
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {"count": 5}
+}
+```
+
+---
+
+## 9. 历史数据缓存接口 (/api/hist)
+
+历史K线数据本地缓存接口，减少对外部数据源的请求频率。
+
+### 9.1 获取缓存历史数据
+
+**接口**：`GET /api/hist/cache/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+| start_date | string | 否 | 开始日期(YYYY-MM-DD)，默认一年前 |
+| end_date | string | 否 | 结束日期(YYYY-MM-DD)，默认当天 |
+
+**请求示例**：
+```
+GET /api/hist/cache/000001?start_date=2025-01-01&end_date=2026-04-08
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "date": "2026-04-08",
+            "open": 12.10,
+            "close": 12.34,
+            "high": 12.50,
+            "low": 12.05,
+            "volume": 12345678,
+            "amount": 152345678.90,
+            "amplitude": 3.72,
+            "quote_change": 2.15,
+            "ups_downs": 0.26,
+            "turnover": 0.85
+        }
+    ]
+}
+```
+
+---
+
+### 9.2 获取缓存状态
+
+**接口**：`GET /api/hist/status/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+
+**请求示例**：
+```
+GET /api/hist/status/000001
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "code": "000001",
+        "cache_count": 365,
+        "latest_date": "2026-04-08"
+    }
+}
+```
+
+---
+
+### 9.3 获取并缓存历史数据
+
+**接口**：`POST /api/hist/fetch/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+| days | int | 否 | 获取天数，默认365 |
+
+**请求示例**：
+```
+POST /api/hist/fetch/000001?days=180
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "code": "000001",
+        "count": 180
+    }
+}
+```
+
+---
+
+### 9.4 批量获取并缓存历史数据
+
+**接口**：`POST /api/hist/fetch-batch`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| days | int | 否 | 获取天数，默认365 |
+| codes | string | 否 | 股票代码列表(逗号分隔)，不填则获取全市场 |
+
+**请求示例**：
+```
+POST /api/hist/fetch-batch?days=180&codes=000001,000002,600000
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "total_count": 540,
+        "success_count": 3,
+        "processed": 3
+    }
+}
+```
+
+**说明**：批量获取限制50只股票，避免请求过多。
+
+---
+
+### 9.5 清除缓存
+
+**接口**：`DELETE /api/hist/clear/{code}`
+
+**参数**：
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| code | string | 是 | 股票代码（路径参数） |
+
+**请求示例**：
+```
+DELETE /api/hist/clear/000001
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "code": "000001",
+        "count": 365
+    }
+}
+```

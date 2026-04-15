@@ -6,13 +6,13 @@
 """
 
 from datetime import date
-from typing import List
+from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.dao.base_dao import BaseDAO
 from app.entity.stock_pattern import StockPattern
 from app.entity.stock_selection import StockSelection
-from app.entity.stock_other import StockBonus, StockLhb, StockBlocktrade, StockBacktestData
+from app.entity.stock_other import StockBonus, StockLhb, StockBlocktrade, StockBacktestData, StockHistData
 
 
 class PatternDAO(BaseDAO[StockPattern]):
@@ -86,3 +86,56 @@ class BonusDAO(BaseDAO[StockBonus]):
     """分红配送DAO"""
     def __init__(self, session: Session):
         super().__init__(StockBonus, session)
+
+
+class HistDAO(BaseDAO[StockHistData]):
+    """历史数据缓存DAO"""
+    def __init__(self, session: Session):
+        super().__init__(StockHistData, session)
+    
+    def find_by_code_range(self, code: str, start_date: date, end_date: date) -> List[StockHistData]:
+        """
+        根据代码和日期范围查询
+        
+        Args:
+            code: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+            
+        Returns:
+            历史数据列表
+        """
+        return self.session.query(StockHistData).filter(
+            StockHistData.code == code,
+            StockHistData.date >= start_date,
+            StockHistData.date <= end_date
+        ).order_by(StockHistData.date).all()
+    
+    def find_latest_date(self, code: str) -> Optional[date]:
+        """
+        获取指定股票的最新缓存日期
+        
+        Args:
+            code: 股票代码
+            
+        Returns:
+            最新日期
+        """
+        result = self.session.query(StockHistData).filter(
+            StockHistData.code == code
+        ).order_by(StockHistData.date.desc()).first()
+        return result.date if result else None
+    
+    def count_by_code(self, code: str) -> int:
+        """
+        统计指定股票的缓存数量
+        
+        Args:
+            code: 股票代码
+            
+        Returns:
+            缓存数量
+        """
+        return self.session.query(StockHistData).filter(
+            StockHistData.code == code
+        ).count()

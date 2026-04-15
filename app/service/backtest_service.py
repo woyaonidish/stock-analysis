@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.dao.stock_dao import StockDAO
 from app.dao.strategy_dao import StrategyDAO
+from app.dao.other_dao import BacktestDAO
+from app.entity.stock_other import StockBacktestData
 from app.service.stock_service import StockService
 from app.database import SessionLocal
 from app.utils.logger import get_logger
@@ -27,6 +29,7 @@ class BacktestService:
         self.session = session or SessionLocal()
         self.stock_dao = StockDAO(self.session)
         self.strategy_dao = StrategyDAO(self.session)
+        self.backtest_dao = BacktestDAO(self.session)
         self.stock_service = StockService(self.session)
     
     def backtest_strategy(
@@ -209,3 +212,128 @@ class BacktestService:
         """关闭会话"""
         if self.session:
             self.session.close()
+    
+    def save_backtest_rates(self, code: str, query_date: date, hist_data: pd.DataFrame) -> bool:
+        """
+        计算并保存股票的1-100日收益率
+        
+        Args:
+            code: 股票代码
+            query_date: 查询日期
+            hist_data: 历史数据（需包含至少100日后的数据）
+            
+        Returns:
+            是否保存成功
+        """
+        try:
+            if hist_data is None or hist_data.empty:
+                return False
+            
+            # 找到查询日期的数据行
+            hist_data['date'] = pd.to_datetime(hist_data['date'])
+            query_date_dt = pd.to_datetime(query_date)
+            mask = hist_data['date'] == query_date_dt
+            
+            if not mask.any():
+                logger.warning(f"历史数据中未找到 {query_date} 的数据")
+                return False
+            
+            idx = hist_data.index[mask][0]
+            close_price = hist_data.iloc[idx]['close']
+            
+            # 创建回测数据实体
+            entity = StockBacktestData(date=query_date, code=code)
+            
+            # 计算未来1-100日收益率
+            for i in range(1, 101):
+                if idx + i < len(hist_data):
+                    future_close = hist_data.iloc[idx + i]['close']
+                    rate = (future_close - close_price) / close_price * 100
+                    setattr(entity, f'rate_{i}', round(rate, 2))
+                else:
+                    setattr(entity, f'rate_{i}', None)
+            
+            # 保存到数据库（先删除旧数据）
+            self.backtest_dao.delete_by_date_and_code(query_date, code)
+            self.backtest_dao.save(entity)
+            logger.info(f"保存回测数据成功: {code} @ {query_date}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"保存回测数据失败: {e}")
+            return False
+    
+    def batch_save_backtest_rates(self, query_date: date) -> int:
+        """
+        批量计算并保存当日所有股票的回测收益率
+        
+        Args:
+            query_date: 查询日期
+            
+        Returns:
+            保存记录数
+        """
+        try:
+            # 获取当日股票列表
+            stocks = self.stock_dao.find_by_date(query_date)
+            if not stocks:
+                logger.warning(f"未找到 {query_date} 的股票数据")
+                return 0
+            
+            count = 0
+            for stock in stocks:
+                try:
+                    # 获取历史数据（需要至少100日后的数据）
+                    end_date = query_date + timedelta(days=150)  # 留足够余量
+                    hist_data = self.stock_service.get_stock_hist(
+                        stock.code,
+                        start_date=query_date.strftime("%Y%m%d"),
+                        end_date=end_date.strftime("%Y%m%d")
+                    )
+                    
+                    if hist_data and len(hist_data) >= 100:
+                        if self.save_backtest_rates(stock.code, query_date, hist_data):
+                            count += 1
+                            
+                except Exception as e:
+                    logger.warning(f"处理股票 {stock.code} 失败: {e}")
+                    continue
+            
+            logger.info(f"批量保存回测数据完成，共 {count} 条")
+            return count
+            
+        except Exception as e:
+            logger.error(f"批量保存回测数据失败: {e}")
+            return 0
+    
+    def get_backtest_rates(self, code: str, query_date: date) -> Optional[Dict]:
+        """
+        获取股票的回测收益率数据
+        
+        Args:
+            code: 股票代码
+            query_date: 查询日期
+            
+        Returns:
+            收益率字典
+        """
+        try:
+            entity = self.backtest_dao.find_by_id(date=query_date, code=code)
+            if entity is None:
+                return None
+            
+            rates = {}
+            for i in range(1, 101):
+                rate = getattr(entity, f'rate_{i}', None)
+                if rate is not None:
+                    rates[f'rate_{i}'] = rate
+            
+            return {
+                'code': code,
+                'date': str(query_date),
+                'rates': rates
+            }
+            
+        except Exception as e:
+            logger.error(f"获取回测数据失败: {e}")
+            return None
