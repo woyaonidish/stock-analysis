@@ -154,7 +154,33 @@ class BaseDAO(Generic[T]):
         """
         批量插入或更新（upsert）
         
-        对于已存在的数据先删除再插入
+        注意：此方法用于批次保存，不删除已有数据，直接插入新数据
+        如果需要替换已有数据，应在调用前先删除
+        
+        Args:
+            entities: 实体列表
+            key_fields: 主键字段列表（仅用于记录，不参与删除逻辑）
+            
+        Returns:
+            处理的记录数
+        """
+        if not entities:
+            return 0
+        
+        try:
+            # 直接批量插入，不删除已有数据
+            # 已有数据在 fetch_and_save_daily_data 开头已删除
+            self.session.bulk_save_objects(entities)
+            self.session.commit()
+            return len(entities)
+            
+        except Exception as e:
+            self.session.rollback()
+            raise e
+    
+    def upsert_by_key(self, entities: List[T], key_fields: List[str] = None) -> int:
+        """
+        按主键逐条删除后插入（用于需要替换特定记录的场景）
         
         Args:
             entities: 实体列表
@@ -170,22 +196,16 @@ class BaseDAO(Generic[T]):
             key_fields = ['date', 'code']
         
         try:
-            # 按主键分组收集值
-            key_value_sets = {}
             for entity in entities:
-                # 提取第一个主键字段的值（通常是 date）
-                if len(key_fields) >= 1 and hasattr(entity, key_fields[0]):
-                    first_key = key_fields[0]
-                    first_val = getattr(entity, first_key)
-                    if first_val not in key_value_sets:
-                        key_value_sets[first_val] = []
-                    key_value_sets[first_val].append(entity)
-            
-            # 批量删除：按第一个主键值批量删除
-            for first_val in key_value_sets.keys():
-                self.session.query(self.model).filter(
-                    getattr(self.model, key_fields[0]) == first_val
-                ).delete(synchronize_session=False)
+                # 构建主键查询条件
+                key_conditions = {}
+                for field in key_fields:
+                    if hasattr(entity, field):
+                        key_conditions[field] = getattr(entity, field)
+                
+                # 删除已存在的单条记录
+                if key_conditions:
+                    self.session.query(self.model).filter_by(**key_conditions).delete(synchronize_session=False)
             
             # 批量插入新数据
             self.session.bulk_save_objects(entities)

@@ -118,49 +118,65 @@ curl -X POST "http://localhost:9988/api/stocks/fetch"
 **错误信息**：
 ```
 UNIQUE constraint failed: cn_stock_spot.date, cn_stock_spot.code
-This Session's transaction has been rolled back due to a previous exception during flush
+批次 61 保存失败: This Session's transaction has been rolled back...
+每次保存47条，前面批次的数据都没了
 ```
 
 **根本原因**：
 
-**Session状态恢复问题**，而非数据重复：
+**`upsert_all` 方法逻辑错误**：每个批次按日期删除当天所有数据，导致：
 
-1. 某个批次保存时发生异常（可能是真正的约束冲突或其他错误）
-2. `upsert_all` 执行 rollback，Session 进入"已回滚"状态
-3. 异常被捕获后只记录日志，循环继续执行
-4. 后续批次使用同一个 Session，但 Session 状态异常
-5. SQLAlchemy 报错："rolled back due to a previous exception"
+```
+批次1：删除 date=2026-04-16 所有数据 → 插入50条
+批次2：删除 date=2026-04-16 所有数据（包括批次1的50条！）→ 插入47条
+批次3：删除 date=2026-04-16 所有数据（包括批次2的47条！）→ ...
+```
 
-**注意**：沪市（60xx、68xx）和深市（00xx、30xx）代码格式本身就不同，不可能有重叠。
+**问题代码**（base_dao.py 第184-188行）：
+```python
+# 错误逻辑：按第一个主键（date）批量删除
+for first_val in key_value_sets.keys():
+    self.session.query(self.model).filter(
+        getattr(self.model, key_fields[0]) == first_val  # 删除当天所有数据！
+    ).delete(synchronize_session=False)
+```
 
 **修复方案**：
 
-在 `_save_batch_data` 异常处理中，rollback 后显式开始新事务：
+`upsert_all` 改为直接批量插入，不删除已有数据：
 
 ```python
-except Exception as e:
-    self.session.rollback()
-    logger.error(f"批次保存失败: {e}")
-    #关键修复：rollback 后显式开始新事务
+def upsert_all(self, entities: List[T], key_fields: List[str] = None) -> int:
     try:
-        self.session.begin()
-    except:
-        pass
-    raise e
+        # 直接批量插入，不删除已有数据
+        # 已有数据在 fetch_and_save_daily_data 开头已删除
+        self.session.bulk_save_objects(entities)
+        self.session.commit()
+        return len(entities)
+    except Exception as e:
+        self.session.rollback()
+        raise e
 ```
 
-**多层防御**：
+**正确的数据流**：
 
-| 层级 | 位置 | 修复内容 |
-|------|------|----------|
-| 源头 | `get_stock_list()` | 合并后去重（防御性） |
-| 中间 | `get_stock_realtime_batch()` | symbols 去重（防御性） |
-| 末端 | `upsert_all()` | 批量保存先删除再插入 |
-| 异常处理 | `_save_batch_data()` | rollback 后 begin 新事务 |
+```
+fetch_and_save_daily_data:
+1. delete_by_date(trade_date)  # 删除当天所有旧数据（一次性）
+2. 批次1：直接插入50条 → commit
+3. 批次2：直接插入47条 → commit  # 前面批次的50条还在！
+4. 批次3：直接插入... → commit
+```
+
+**新增方法**：
+
+| 方法 | 用途 |
+|------|------|
+| `upsert_all` | 批次保存，直接插入（不删除） |
+| `upsert_by_key` | 按主键逐条删除后插入（替换特定记录） |
 
 **手动重试**：
 ```bash
-# 通过API重新抓取当日数据
 curl -X POST "http://localhost:9988/api/stocks/fetch"
 ```
 
