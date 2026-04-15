@@ -184,38 +184,46 @@ class StockService:
         if data is None or data.empty:
             return 0
         
-        # 转换为实体列表
-        entities = []
-        for _, row in data.iterrows():
-            entity = StockSpot(
-                date=trade_date,
-                code=str(row.get('code', '')),
-                name=str(row.get('name', '')),
-                open_price=float(row.get('open_price', 0) or 0),
-                close_price=float(row.get('close_price', 0) or 0),
-                high_price=float(row.get('high_price', 0) or 0),
-                low_price=float(row.get('low_price', 0) or 0),
-                pre_close_price=float(row.get('pre_close_price', 0) or 0),
-                volume=int(row.get('volume', 0) or 0),
-                amount=int(row.get('amount', 0) or 0),
-                bid1=float(row.get('bid1', 0) or 0),
-                bid1_vol=int(row.get('bid1_vol', 0) or 0),
-                bid2=float(row.get('bid2', 0) or 0),
-                bid2_vol=int(row.get('bid2_vol', 0) or 0),
-                bid3=float(row.get('bid3', 0) or 0),
-                bid3_vol=int(row.get('bid3_vol', 0) or 0),
-                ask1=float(row.get('ask1', 0) or 0),
-                ask1_vol=int(row.get('ask1_vol', 0) or 0),
-                ask2=float(row.get('ask2', 0) or 0),
-                ask2_vol=int(row.get('ask2_vol', 0) or 0),
-                ask3=float(row.get('ask3', 0) or 0),
-                ask3_vol=int(row.get('ask3_vol', 0) or 0),
-            )
-            entities.append(entity)
-        
-        # 批量保存
-        self.stock_dao.save_all(entities)
-        return len(entities)
+        try:
+            # 转换为实体列表
+            entities = []
+            for _, row in data.iterrows():
+                entity = StockSpot(
+                    date=trade_date,
+                    code=str(row.get('code', '')),
+                    name=str(row.get('name', '')),
+                    open_price=float(row.get('open_price', 0) or 0),
+                    close_price=float(row.get('close_price', 0) or 0),
+                    high_price=float(row.get('high_price', 0) or 0),
+                    low_price=float(row.get('low_price', 0) or 0),
+                    pre_close_price=float(row.get('pre_close_price', 0) or 0),
+                    volume=int(row.get('volume', 0) or 0),
+                    amount=int(row.get('amount', 0) or 0),
+                    bid1=float(row.get('bid1', 0) or 0),
+                    bid1_vol=int(row.get('bid1_vol', 0) or 0),
+                    bid2=float(row.get('bid2', 0) or 0),
+                    bid2_vol=int(row.get('bid2_vol', 0) or 0),
+                    bid3=float(row.get('bid3', 0) or 0),
+                    bid3_vol=int(row.get('bid3_vol', 0) or 0),
+                    ask1=float(row.get('ask1', 0) or 0),
+                    ask1_vol=int(row.get('ask1_vol', 0) or 0),
+                    ask2=float(row.get('ask2', 0) or 0),
+                    ask2_vol=int(row.get('ask2_vol', 0) or 0),
+                    ask3=float(row.get('ask3', 0) or 0),
+                    ask3_vol=int(row.get('ask3_vol', 0) or 0),
+                )
+                entities.append(entity)
+            
+            # 使用 upsert_all 处理已存在数据（先删除后插入）
+            count = self.stock_dao.upsert_all(entities, key_fields=['date', 'code'])
+            logger.debug(f"批次保存 {count} 条数据")
+            return count
+            
+        except Exception as e:
+            # 发生异常时 rollback
+            self.session.rollback()
+            logger.error(f"批次保存失败: {e}")
+            raise e
     
     async def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
         """

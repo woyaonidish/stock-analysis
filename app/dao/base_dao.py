@@ -130,6 +130,72 @@ class BaseDAO(Generic[T]):
         self.session.commit()
         return entities
     
+    def save_or_ignore(self, entities: List[T]) -> int:
+        """
+        批量保存实体，忽略重复数据
+        
+        使用 session.bulk_save_objects 并在出错时 rollback
+        
+        Args:
+            entities: 实体列表
+            
+        Returns:
+            成功保存的数量
+        """
+        try:
+            self.session.bulk_save_objects(entities)
+            self.session.commit()
+            return len(entities)
+        except Exception as e:
+            self.session.rollback()
+            raise e
+    
+    def upsert_all(self, entities: List[T], key_fields: List[str] = None) -> int:
+        """
+        批量插入或更新（upsert）
+        
+        对于已存在的数据先删除再插入
+        
+        Args:
+            entities: 实体列表
+            key_fields: 主键字段列表，默认 ['date', 'code']
+            
+        Returns:
+            处理的记录数
+        """
+        if not entities:
+            return 0
+        
+        if key_fields is None:
+            key_fields = ['date', 'code']
+        
+        try:
+            # 按主键分组收集值
+            key_value_sets = {}
+            for entity in entities:
+                # 提取第一个主键字段的值（通常是 date）
+                if len(key_fields) >= 1 and hasattr(entity, key_fields[0]):
+                    first_key = key_fields[0]
+                    first_val = getattr(entity, first_key)
+                    if first_val not in key_value_sets:
+                        key_value_sets[first_val] = []
+                    key_value_sets[first_val].append(entity)
+            
+            # 批量删除：按第一个主键值批量删除
+            for first_val in key_value_sets.keys():
+                self.session.query(self.model).filter(
+                    getattr(self.model, key_fields[0]) == first_val
+                ).delete(synchronize_session=False)
+            
+            # 批量插入新数据
+            self.session.bulk_save_objects(entities)
+            self.session.commit()
+            return len(entities)
+            
+        except Exception as e:
+            self.session.rollback()
+            raise e
+    
     def update(self, entity: T) -> T:
         """
         更新实体

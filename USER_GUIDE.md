@@ -255,6 +255,27 @@ sqlite3 app/data/instock.db
 SCHEDULER_ENABLED = False
 ```
 
+### Q6: 批次保存报错 "UNIQUE constraint failed"
+
+**错误信息**：
+```
+UNIQUE constraint failed: cn_stock_spot.date, cn_stock_spot.code
+This Session's transaction has been rolled back...
+```
+
+**原因**：批次保存时遇到已存在的数据（date+code 主键重复）
+
+**解决**：已修复，使用 upsert 策略（先删除后插入）
+
+**说明**：
+- 系统已改用 `upsert_all` 方法处理重复数据
+- 同一日期的数据会先删除再插入，避免约束冲突
+- 若仍遇到问题，可手动删除当日数据后重试：
+```bash
+# 通过API重新抓取当日数据
+curl -X POST "http://localhost:9988/api/stocks/fetch"
+```
+
 ---
 
 ## 8. 注意事项
