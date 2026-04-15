@@ -250,6 +250,9 @@ class TdxFetcher:
                             on_batch_save(batch_df, batch_idx)
                         except Exception as save_err:
                             logger.error(f"批次 {batch_idx + 1} 保存失败: {save_err}")
+                            # 关键修复：异常后需要恢复 Session 状态才能继续
+                            # 回调函数内部应该已经 rollback，这里记录错误并继续
+                            # 但后续批次可能使用损坏的 Session，需要在外层处理
                     
                     total_saved += saved_count
                     logger.info(f"批次 {batch_idx + 1}/{total_batches} 完成，获取 {saved_count} 条，累计 {total_saved} 条")

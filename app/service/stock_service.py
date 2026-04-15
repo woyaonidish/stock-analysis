@@ -220,9 +220,14 @@ class StockService:
             return count
             
         except Exception as e:
-            # 发生异常时 rollback
+            # 发生异常时 rollback，并恢复 Session 状态
             self.session.rollback()
             logger.error(f"批次保存失败: {e}")
+            #关键修复：rollback 后显式开始新事务，确保后续批次可以正常使用 Session
+            try:
+                self.session.begin()
+            except:
+                pass  # 如果 begin 失败，下次操作会自动开始
             raise e
     
     async def fetch_and_save_daily_data(self, trade_date: date = None) -> int:
