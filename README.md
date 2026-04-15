@@ -150,6 +150,7 @@ python -m app.main
 | 文档 | 说明 |
 |------|------|
 | [USER_GUIDE.md](USER_GUIDE.md) | 用户指南（安装、配置、使用、注意事项） |
+| [FAQ.md](FAQ.md) | 常见问题解答 |
 | [interface.md](interface.md) | API接口详细文档 |
 
 ## API 接口文档
