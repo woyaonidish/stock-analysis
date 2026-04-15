@@ -145,6 +145,13 @@ python -m app.main
 - Swagger UI: http://localhost:9988/docs
 - ReDoc: http://localhost:9988/redoc
 
+## 文档索引
+
+| 文档 | 说明 |
+|------|------|
+| [USER_GUIDE.md](USER_GUIDE.md) | 用户指南（安装、配置、使用、注意事项） |
+| [interface.md](interface.md) | API接口详细文档 |
+
 ## API 接口文档
 
 详细的API接口文档请查看 [interface.md](interface.md)。
